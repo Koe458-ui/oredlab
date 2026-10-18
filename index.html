@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ored AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- 3D scene  -->
+  <canvas id="scene"></canvas>
+
+  <!-- Loading screen -->
+  <div class="loader" id="loader">
+    <div class="loader-ring"></div>
+    <p>Loading <span id="loader-pct">0%</span></p>
+  </div>
+
+  <!-- Top header -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true"><path fill="#FF6A00" d="M405.30 433.58A232 232 0 0 1 78.42 106.70L163.93 192.22A112 112 0 0 0 319.78 348.07Z"/><path fill="#FF1F2D" d="M106.70 78.42A232 232 0 0 1 433.58 405.30L348.07 319.78A112 112 0 0 0 192.22 163.93Z"/></svg>
+      <span class="brand-name">Ored <strong>AI</strong></span>
+    </div>
+
+    <nav class="nav" aria-label="Main">
+      <button class="nav-btn" type="button">Chat</button>
+
+      <button class="nav-btn nav-btn--download" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" />
+        </svg>
+        Download
+        <span class="badge">Windows only</span>
+      </button>
+
+      <button class="nav-btn" type="button">Pricing</button>
+      <button class="nav-btn" type="button">Policy</button>
+    </nav>
+
+    <button class="icon-btn" type="button" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    </button>
+  </header>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

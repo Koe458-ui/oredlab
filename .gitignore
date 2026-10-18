@@ -1,0 +1,14 @@
+.dev.vars
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.yaml
+secrets.yml
+__pycache__/
+*.pyc

@@ -1,0 +1,50 @@
+name: ored
+
+on:
+  push:
+    branches: ['**']
+    paths: ['ored/model/**', '.github/workflows/ored.yml']
+  pull_request:
+    paths: ['ored/model/**', '.github/workflows/ored.yml']
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: ored/model
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies (CPU-only torch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Smoke-test the Transformer pipeline end to end
+        run: |
+          C=tests/configs/language_model.yaml
+          SMALL="--set data.source=generated --set data.corpus.dir=data/raw/ci_corpus --set data.corpus.sentence_lines=300 --set data.corpus.max_operand=9 --set data.corpus.arithmetic_repeats=3 --set data.block_size=32 --set data.stride=16 --set data.batch_size=8 --set model.d_model=32 --set model.n_layer=2 --set model.n_head=2 --set model.d_ff=64 --set training.device=cpu"
+          python scripts/generate_corpus.py --config $C $SMALL
+          python scripts/train.py --config $C --generated-corpus $SMALL --set training.epochs=2 --run-name ci_smoke
+          python scripts/evaluate.py --checkpoint checkpoints/ci_smoke/best.pt --device cpu --samples 1
+          python scripts/infer.py --checkpoint checkpoints/ci_smoke/best.pt --device cpu --text "9 + 6 = " --quiet

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ored"
+version = "0.1.0"
+description = "Ored AI -- an AI built from scratch, no pretrained weights."
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "torch>=2.2,<3.0",
+    "numpy>=1.24,<3.0",
+    "PyYAML>=6.0,<7.0",
+    "pyarrow>=15.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+corpus = ["zstandard>=0.22,<1.0"]
+
+[project.scripts]
+ored-generate-corpus = "ored.data.corpus:main"
+ored-train = "ored.training.trainer:main"
+ored-evaluate = "ored.evaluation.evaluator:main"
+ored-infer = "ored.inference.predictor:main"
+ored-generate = "ored.inference.generate_cli:main"
+ored-export-learning = "ored.learning.export_cli:main"
+ored-checkpoints = "ored.learning.checkpoint_cli:main"
+ored-serve = "ored.serving.server:main"
+ored-distributed = "ored.distributed.cli:main"
+ored-pretrain = "ored.training.pretrain:main"
+ored-corpus = "ored.data.corpus_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
