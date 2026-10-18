@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Ored AI</title>
+  <meta name="description" content="Ored AI — your AI assistant." />
+  <meta name="theme-color" content="#000000" />
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- three.js from a CDN via an import map (no build tools needed).
+       Keep both URLs on the same version. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- Fixed full-screen 3D canvas behind everything -->
+  <canvas id="scene" aria-hidden="true"></canvas>
+
+  <!-- Loading screen (hidden by main.js once robot.glb has loaded) -->
+  <div id="loader" class="loader" role="status" aria-live="polite">
+    <div class="loader__brand">Ored AI</div>
+    <div class="loader__bar"><span id="loader-fill"></span></div>
+    <p id="loader-text" class="loader__text">Loading 0%</p>
+  </div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="header">
+    <a class="header__logo" href="#page-room" aria-label="Ored AI home">
+      <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="3" />
+        <circle cx="16" cy="16" r="4.5" fill="currentColor" />
+      </svg>
+      <span>Ored AI</span>
+    </a>
+
+    <nav class="header__nav" aria-label="Main">
+      <a href="#chat">Chat</a>
+      <a href="#download" title="Available for Windows">
+        Download
+        <!-- Windows-only for now -->
+        <svg class="win-icon" viewBox="0 0 16 16" aria-label="Windows">
+          <path fill="currentColor" d="M0 2.2 6.5 1.3v6.2H0zm7.3-1L16 0v7.5H7.3zM0 8.3h6.5v6.3L0 13.7zm7.3 0H16V16l-8.7-1.2z" />
+        </svg>
+      </a>
+      <a href="#pricing">Pricing</a>
+      <a href="#policy">Policy</a>
+    </nav>
+
+    <button class="header__settings" type="button" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="M19.14 12.94a7.5 7.5 0 0 0 .05-.94 7.5 7.5 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.630-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.84a.5.5 0 0 0-.49.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.67 8.48a.5.5 0 0 0 .12.64l2.03 1.58a7.5 7.5 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.04.24.25.42.49.42h3.840c.24 0 .45-.18.49-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.08.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z" />
+      </svg>
+    </button>
+  </header>
+  
+  <main class="story">
+
+    <!-- Room (scroll drives frames 0–100) -->
+    <section class="page" id="page-room">
+      <div class="col col--left reveal">
+        <h2>Text</h2>
+        <p>text text text text text text</p>
+      </div>
+      <div class="col col--middle" aria-hidden="true"></div>
+      <div class="col col--right reveal">
+        <h2>Text</h2>
+        <p>text text text text text text</p>
+      </div>
+    </section>
+
+    <!-- Music part (scroll drives frames 100–200) -->
+    <section class="page" id="page-music">
+      <div class="col col--left reveal">
+        <h2>Text</h2>
+        <p>text text text text text text</p>
+      </div>
+      <div class="col col--middle" aria-hidden="true"></div>
+      <div class="col col--right reveal">
+        <h2>Text</h2>
+        <p>text text text text text text</p>
+      </div>
+    </section>
+
+    <!-- Activity (frames 200–920 loop automatically) -->
+    <section class="page" id="page-activity">
+      <div class="col col--left reveal">
+        <h2>Text</h2>
+        <p>text text text text text text</p>
+      </div>
+      <div class="col col--middle" aria-hidden="true"></div>
+      <div class="col col--right reveal">
+        <h2>Text</h2>
+        <p>text text text text text text</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- onerror catches a failed download of main.js or any of its three.js imports -->
+  <script type="module" src="main.js"
+    onerror="document.getElementById('loader-text').textContent='Could not load the 3D engine. Check your internet connection.'"></script>
+</body>
+</html>
