@@ -13,41 +13,31 @@ Security updates are provided for the versions listed below.
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Oredlab, please report it responsibly.
+If you find any security issue in Oredlab, please report it so we can check and fix it.
 
-Do not disclose security vulnerabilities publicly until they have been reviewed and addressed.
+Please do not share the issue publicly before it is fixed.
 
-How to Report
+## How to Report
 
-Use GitHub's Private vulnerability reporting feature.
+Use GitHub's Private vulnerability reporting feature to report the issue.
 
-include enough technical detail to help reproduce and investigate the issue.
+Explain what the issue is, how it works, and how we can reproduce it.
 
-Please do not include passwords, access tokens, private keys, personal information, or other sensitive data in your report.
+Do not share passwords, access tokens, private keys, personal information, or any other sensitive data in your report.
 
-## Scopes
+## What to Report
 
-Please report security issues that could affect Oredlab, its users, data, infrastructure, or connected services.
+Report any security issue that could affect Oredlab, its users, or their data.
 
-Examples include:
+Some examples are:
 
-1) Authentication or authorization bypasses.
+- Bypassing login or getting access without permission.
+- Taking control of another user's account.
+- Accessing private user data.
+- SQL injection, XSS, or other code injection issues.
+- Uploading unsafe files or accessing files without permission.
+- Issues with payments, wallets, or transactions.
+- Server settings that expose private data.
+- Security issues in APIs or database access rules.
 
-2) Account takeover or privilege escalation.
-
-3) Exposure of private user information.
-
-4) SQL injection or other injection vulnerabilities.
-
-5) Cross-site scripting (XSS).
-
-6) Insecure file uploads or unauthorized file access.
-
-7) Payment, wallet, or transaction security flaws.
-
-8) Server-side configuration errors that expose sensitive information.
-
-9) Security weaknesses in APIs or access-control policies
-
-
-
+If you find something that looks like a security issue but are not sure, you can still report it privately so we can check it.
