@@ -1,38 +1,42 @@
 ---
 name: Bug report
 about: 'Create a report to help us improve our model '
-title: ''
-labels: ''
 assignees: Koe458-ui
 
 ---
 
-**Describe the bug**
+## Describe the bug
 A clear and concise description of what the bug is.
 
-**To Reproduce**
+## To Reproduce
 Steps to reproduce the behavior:
 1. Go to oredlab.com
 2. Click on download 
 3. Scroll down to download model 
 4. See error 
 
-**Expected behavior**
+## Expected behavior
 A clear and concise description of what you expected to happen.
 
-**Screenshots**
+## Screenshots
 If applicable, add screenshots to help explain your problem.
 
-**Desktop (please complete the following information):**
+## Desktop (please complete the following information):
  - OS: [e.g. iOS , Android, window , etc ]
  - Browser [e.g. brave , edge ,chrome, safari]
  - Version [e.g. 22]
 
-**Smartphone (please complete the following information):**
+## Smartphone (please complete the following information):
  - Device: [e.g. samsung s26]
  - OS: [e.g. Android 16]
  - Browser [e.g. Google , brave , etc ]
  - Version [the version you currently on ]
+
+## Any other device
+ - Device - [ e.g tablet, tv , etc ]
+ - Os - [ e.g max os , Android, linux ]
+ - browser - [ e.g brave , google ]
+ - version 
 
 **Additional context**
 Add any other context about the problem here.
