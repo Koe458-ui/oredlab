@@ -30,32 +30,32 @@
 
 <table>
   <tr>
-    <td align="center" width="33%">
-      <h3>🧱 Built from scratch</h3>
-      <p>Our own model, not a wrapper around someone else's.</p>
-    </td>
-    <td align="center" width="33%">
-      <h3>⬇️ Free local download</h3>
-      <p>Download Ored and keep it on your own PC. No cost.</p>
-    </td>
-    <td align="center" width="33%">
-      <h3>💻 Local inference</h3>
-      <p>Runs on your machine with no cloud AI services.</p>
-    </td>
+    <th align="center">Feature</th>
+    <th align="center">Details</th>
   </tr>
   <tr>
-    <td align="center" width="33%">
-      <h3>🧠 Training and checkpoints</h3>
-      <p>Currently in training. Checkpoints shared as they become stable.</p>
-    </td>
-    <td align="center" width="33%">
-      <h3>🔓 Open development</h3>
-      <p>Public repo and an open roadmap. Follow along or contribute.</p>
-    </td>
-    <td align="center" width="33%">
-      <h3>🔒 Privacy and independence</h3>
-      <p>Your prompts stay on your machine. No accounts, no API keys.</p>
-    </td>
+    <td align="center">🧱 <b>Built from scratch</b></td>
+    <td align="center">Our own model, not a wrapper around someone else's</td>
+  </tr>
+  <tr>
+    <td align="center">⬇️ <b>Free local download</b></td>
+    <td align="center">Download Ored and keep it on your own PC</td>
+  </tr>
+  <tr>
+    <td align="center">💻 <b>Local inference</b></td>
+    <td align="center">Runs on your machine, no cloud AI services</td>
+  </tr>
+  <tr>
+    <td align="center">🧠 <b>Training and checkpoints</b></td>
+    <td align="center">Currently in training, checkpoints shared when stable</td>
+  </tr>
+  <tr>
+    <td align="center">🔓 <b>Open development</b></td>
+    <td align="center">Public repo and an open roadmap</td>
+  </tr>
+  <tr>
+    <td align="center">🔒 <b>Privacy and independence</b></td>
+    <td align="center">Your prompts stay on your machine, no accounts or API keys</td>
   </tr>
 </table>
 
@@ -64,6 +64,7 @@
 <p align="center">
   <sub>Want to help? See <a href="CONTRIBUTING.md">CONTRIBUTING.md</a></sub>
 </p>
+
 
 
 <h2 align="center">🗺️ Roadmap</h2>
