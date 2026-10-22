@@ -14,5 +14,9 @@ A clear and concise description of what you want to happen.
 ## Describe alternatives you've considered
 A clear and concise description of any alternative solutions or features you've considered.
 
-## Additional context
+Features should be properly explained and should be valid 
+
+## Additional contexts 
 Add any other context or screenshots about the feature request here.
+
+
