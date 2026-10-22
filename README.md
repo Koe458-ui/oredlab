@@ -33,7 +33,7 @@
 </p>
 
 <h1 align="center">Roadmap</h1>
-<p align="center">
+
 [x] Project website and domain (oredlab.com)
 [x] Repository, license, and community files
 [ ] Complete first training run
@@ -42,7 +42,7 @@
 [ ] Setup guide for Windows, macOS and Linux
 [ ] Public evaluation results
 [ ] Packaged downloadable app
-<p>
+
 <h1 align="center">Licence</h1>
 <p align="center">Copyright © 2026 OREDLAB
 
