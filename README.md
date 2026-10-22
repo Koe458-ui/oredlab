@@ -20,15 +20,51 @@
 <h1 align="center">Live site</h1>
 <p align="center">https://oredlab.com</p>
 
-<h1 align="center">Features</h1>
+<h2 align="center">✨ Features</h2>
+
 <p align="center">
--Built from scratch: our own model, not a wrapper around someone else's
--Free local download: run it on your own PC
--Local inference: works without cloud-based AI services
--Training and checkpoints: progress shared as it happens
--Open development: public roadmap and open repo
--Privacy and independence: your prompts stay on your machine
+  Everything Ored is built around: simple, private and yours.
 </p>
+
+<div align="center">
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <h3>🧱 Built from scratch</h3>
+      <p>Our own model, not a wrapper around someone else's.</p>
+    </td>
+    <td align="center" width="33%">
+      <h3>⬇️ Free local download</h3>
+      <p>Download Ored and keep it on your own PC. No cost.</p>
+    </td>
+    <td align="center" width="33%">
+      <h3>💻 Local inference</h3>
+      <p>Runs on your machine with no cloud AI services.</p>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <h3>🧠 Training and checkpoints</h3>
+      <p>Currently in training. Checkpoints shared as they become stable.</p>
+    </td>
+    <td align="center" width="33%">
+      <h3>🔓 Open development</h3>
+      <p>Public repo and an open roadmap. Follow along or contribute.</p>
+    </td>
+    <td align="center" width="33%">
+      <h3>🔒 Privacy and independence</h3>
+      <p>Your prompts stay on your machine. No accounts, no API keys.</p>
+    </td>
+  </tr>
+</table>
+
+</div>
+
+<p align="center">
+  <sub>Want to help? See <a href="CONTRIBUTING.md">CONTRIBUTING.md</a></sub>
+</p>
+
 
 <h2 align="center">🗺️ Roadmap</h2>
 
