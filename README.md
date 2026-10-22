@@ -57,7 +57,7 @@
   <tr>
     <td align="center"><img src="https://img.shields.io/badge/-DONE-34d399?style=flat-square" alt="Done" /></td>
     <td align="center"><b>Website and domain</b></td>
-    <td align="center"><a href="https://oredlab.com">oredlab.com</a> live on Cloudflare</td>
+    <td align="center"><a href="https://oredlab.com">oredlab.com</a> fully available</td>
   </tr>
   <tr>
     <td align="center"><img src="https://img.shields.io/badge/-DONE-34d399?style=flat-square" alt="Done" /></td>
@@ -65,7 +65,7 @@
     <td align="center">Apache-2.0, contributing, security policy</td>
   </tr>
   <tr>
-    <td align="center"><img src="https://img.shields.io/badge/-IN%20PROGRESS-60a5fa?style=flat-square" alt="In progress" /></td>
+    <td align="center"><img src="https://img.shields.io/badge/-DONE-34d399?style=flat-square" alt="Done" /></td>
     <td align="center"><b>First training run</b></td>
     <td align="center">Training from scratch</td>
   </tr>
