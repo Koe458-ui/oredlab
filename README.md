@@ -19,9 +19,11 @@
   <b>oredlab</b> is an independent AI model built from the ground up, designed to be accessible, downloadable, and free to run locally.
 </p>
 
-<h2 align="center">🌐 Live Site</h2>
+<div align="center">
 
-<table align="center">
+<h2>🌐 Live Site</h2>
+
+<table>
   <tr>
     <td><b>URL</b></td>
     <td><a href="https://oredlab.com">oredlab.com</a></td>
@@ -35,6 +37,8 @@
     <td><a href="https://github.com/Koe458-ui/oredlab">Koe458-ui/oredlab</a></td>
   </tr>
 </table>
+
+</div>
 
 <h2 align="center">✨ Features</h2>
 
