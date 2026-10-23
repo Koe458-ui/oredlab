@@ -19,11 +19,16 @@
   <b>oredlab</b> is an independent AI model built from the ground up, designed to be accessible, downloadable, and free to run locally.
 </p>
 
-<h1 align="center">Live site</h1>
+<h2 align="center">🌐 Live Site</h2>
+
 <p align="center">
-  <a href="https://oredlab.com">
-    <img src="https://img.shields.io/badge/Live_site-oredlab.com-blue?style=for-the-badge" alt="Live site">
-  </a>
+  <a href="https://oredlab.com"><b>oredlab.com</b></a>
+</p>
+
+<p align="center">
+  <b>URL:</b> <a href="https://oredlab.com">oredlab.com</a><br>
+  <b>Hosting:</b> Cloudflare Workers<br>
+  <b>Repo:</b> <a href="https://github.com/Koe458-ui/oredlab">Koe458-ui/oredlab</a>
 </p>
 
 <h2 align="center">✨ Features</h2>
