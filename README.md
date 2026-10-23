@@ -228,3 +228,26 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
   - Koe (Anish)
   
 </p>
+
+<div align="center">
+
+<h2>🙏 Acknowledgments</h2>
+
+<p>A huge thank you to the AI tools that helped make ored possible:</p>
+
+<table>
+  <tr>
+    <th>Tool</th>
+    <th>Contribution</th>
+  </tr>
+  <tr>
+    <td align="center"><b>Claude</b> (Anthropic)</td>
+    <td>Fixed bugs and helped improve the model</td>
+  </tr>
+  <tr>
+    <td align="center"><b>ChatGPT</b> (OpenAI)</td>
+    <td>Helped fix errors in the code</td>
+  </tr>
+</table>
+
+</div>
