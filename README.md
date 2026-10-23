@@ -15,7 +15,9 @@
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/Koe458-ui/Ored?style=flat)](https://github.com/Koe458-ui/Ored)
 
 <h1 align="center">Ored AI - The ai we all need </h1>
-<p align="center">oredlab is an An independently developed AI model built from the ground up, with a focus on making AI accessible, downloadable, and free to run locally.</p>
+<p align="center">
+  <b>oredlab</b> is an independent AI model built from the ground up, designed to be accessible, downloadable, and free to run locally.
+</p>
 
 <h1 align="center">Live site</h1>
 <p align="center">https://oredlab.com</p>
