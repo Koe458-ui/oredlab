@@ -21,15 +21,20 @@
 
 <h2 align="center">🌐 Live Site</h2>
 
-<p align="center">
-  <a href="https://oredlab.com"><b>oredlab.com</b></a>
-</p>
-
-<p align="center">
-  <b>URL:</b> <a href="https://oredlab.com">oredlab.com</a><br>
-  <b>Hosting:</b> Cloudflare Workers<br>
-  <b>Repo:</b> <a href="https://github.com/Koe458-ui/oredlab">Koe458-ui/oredlab</a>
-</p>
+<table align="center">
+  <tr>
+    <td><b>URL</b></td>
+    <td><a href="https://oredlab.com">oredlab.com</a></td>
+  </tr>
+  <tr>
+    <td><b>Hosting</b></td>
+    <td>Cloudflare Workers</td>
+  </tr>
+  <tr>
+    <td><b>Repo</b></td>
+    <td><a href="https://github.com/Koe458-ui/oredlab">Koe458-ui/oredlab</a></td>
+  </tr>
+</table>
 
 <h2 align="center">✨ Features</h2>
 
