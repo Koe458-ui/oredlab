@@ -154,6 +154,62 @@
   <sub>Updated as development moves. Follow along on <a href="https://oredlab.com">oredlab.com</a></sub>
 </p>
 
+<div align="center">
+
+<h2>🗺️ Ored Model Roadmap</h2>
+
+<table>
+  <tr>
+    <th>Model Parameters</th>
+    <th>Status</th>
+    <th>Notes</th>
+    <th>Download</th>
+  </tr>
+  <tr>
+    <td align="center">1M</td>
+    <td align="center">✅ Done</td>
+    <td align="center">First prototype</td>
+    <td align="center"><a href="#">Download</a></td>
+  </tr>
+  <tr>
+    <td align="center">10M</td>
+    <td align="center">✅ Done</td>
+    <td align="center">Improved quality</td>
+    <td align="center"><a href="#">Download</a></td>
+  </tr>
+  <tr>
+    <td align="center">50M</td>
+    <td align="center">🔄 In Progress</td>
+    <td align="center">Training now</td>
+    <td align="center">Coming soon</td>
+  </tr>
+  <tr>
+    <td align="center">100M</td>
+    <td align="center">⏳ Pending</td>
+    <td align="center">Planned</td>
+    <td align="center">-</td>
+  </tr>
+  <tr>
+    <td align="center">250M</td>
+    <td align="center">⏳ Pending</td>
+    <td align="center">Planned</td>
+    <td align="center">-</td>
+  </tr>
+  <tr>
+    <td align="center">500M</td>
+    <td align="center">⏳ Pending</td>
+    <td align="center">Planned</td>
+    <td align="center">-</td>
+  </tr>
+  <tr>
+    <td align="center">1B</td>
+    <td align="center">⏳ Pending</td>
+    <td align="center">Planned</td>
+    <td align="center">-</td>
+  </tr>
+</table>
+
+</div>
 
 <h1 align="center">Licence</h1>
 <p align="center">Copyright © 2026 OREDLAB
