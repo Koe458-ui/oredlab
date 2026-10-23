@@ -1,4 +1,4 @@
-[<p align="center">
+<p align="center">
   <img src="./assets/logo.svg" width="120" alt="Logo">
 </p>
 
@@ -14,11 +14,31 @@
 ![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=white)
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/Koe458-ui/Ored?style=flat)](https://github.com/Koe458-ui/Ored)
 
-<h1 align="center">Ored AI - The ai we all need </h1>
-<p align="center">oredlab is an An independently developed AI model built from the ground up, with a focus on making AI accessible, downloadable, and free to run locally.</p>
+<h1 align="center">Ored AI - Runs on your machine </h1>
+<p align="center">
+  <b>oredlab</b> is an independent AI model built from the ground up, designed to be accessible, downloadable, and free to run locally.
+</p>
 
-<h1 align="center">Live site</h1>
-<p align="center">https://oredlab.com</p>
+<div align="center">
+
+<h2>🌐 Live Site</h2>
+
+<table>
+  <tr>
+    <td><b>URL</b></td>
+    <td><a href="https://oredlab.com">oredlab.com</a></td>
+  </tr>
+  <tr>
+    <td><b>Hosting</b></td>
+    <td>Cloudflare Workers</td>
+  </tr>
+  <tr>
+    <td><b>Repo</b></td>
+    <td><a href="https://github.com/Koe458-ui/oredlab">Koe458-ui/oredlab</a></td>
+  </tr>
+</table>
+
+</div>
 
 <h2 align="center">✨ Features</h2>
 
@@ -134,6 +154,62 @@
   <sub>Updated as development moves. Follow along on <a href="https://oredlab.com">oredlab.com</a></sub>
 </p>
 
+<div align="center">
+
+<h2>🗺️ Ored Model Roadmap</h2>
+
+<table>
+  <tr>
+    <th>Model Parameters</th>
+    <th>Status</th>
+    <th>Notes</th>
+    <th>Download</th>
+  </tr>
+  <tr>
+    <td align="center">1M</td>
+    <td align="center">✅ Done</td>
+    <td align="center">First prototype</td>
+    <td align="center"><a href="#">Download</a></td>
+  </tr>
+  <tr>
+    <td align="center">10M</td>
+    <td align="center">✅ Done</td>
+    <td align="center">Improved quality</td>
+    <td align="center"><a href="#">Download</a></td>
+  </tr>
+  <tr>
+    <td align="center">50M</td>
+    <td align="center">🔄 In Progress</td>
+    <td align="center">Training now</td>
+    <td align="center">Coming soon</td>
+  </tr>
+  <tr>
+    <td align="center">100M</td>
+    <td align="center">⏳ Pending</td>
+    <td align="center">Planned</td>
+    <td align="center">-</td>
+  </tr>
+  <tr>
+    <td align="center">250M</td>
+    <td align="center">⏳ Pending</td>
+    <td align="center">Planned</td>
+    <td align="center">-</td>
+  </tr>
+  <tr>
+    <td align="center">500M</td>
+    <td align="center">⏳ Pending</td>
+    <td align="center">Planned</td>
+    <td align="center">-</td>
+  </tr>
+  <tr>
+    <td align="center">1B</td>
+    <td align="center">⏳ Pending</td>
+    <td align="center">Planned</td>
+    <td align="center">-</td>
+  </tr>
+</table>
+
+</div>
 
 <h1 align="center">Licence</h1>
 <p align="center">Copyright © 2026 OREDLAB
@@ -152,3 +228,26 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
   - Koe (Anish)
   
 </p>
+
+<div align="center">
+
+<h2>🙏 Acknowledgments</h2>
+
+<p>A huge thank you to the AI tools that helped make ored possible:</p>
+
+<table>
+  <tr>
+    <th>Tool</th>
+    <th>Contribution</th>
+  </tr>
+  <tr>
+    <td align="center"><b>Claude</b> (Anthropic)</td>
+    <td>Fixed bugs and helped improve the model</td>
+  </tr>
+  <tr>
+    <td align="center"><b>ChatGPT</b> (OpenAI)</td>
+    <td>Helped fix errors in the code</td>
+  </tr>
+</table>
+
+</div>
