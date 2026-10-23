@@ -14,7 +14,7 @@
 ![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=white)
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/Koe458-ui/Ored?style=flat)](https://github.com/Koe458-ui/Ored)
 
-<h1 align="center">Ored AI - The ai we all need </h1>
+<h1 align="center">Ored AI - Runs on your machine </h1>
 <p align="center">
   <b>oredlab</b> is an independent AI model built from the ground up, designed to be accessible, downloadable, and free to run locally.
 </p>
