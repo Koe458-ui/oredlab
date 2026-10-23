@@ -20,7 +20,11 @@
 </p>
 
 <h1 align="center">Live site</h1>
-<p align="center">https://oredlab.com</p>
+<p align="center">
+  <a href="https://oredlab.com">
+    <img src="https://img.shields.io/badge/Live_site-oredlab.com-blue?style=for-the-badge" alt="Live site">
+  </a>
+</p>
 
 <h2 align="center">✨ Features</h2>
 
