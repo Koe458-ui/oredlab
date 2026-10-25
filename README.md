@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">Oredlab</h1>
-<p align="center">Developer • AI • local download</p>
+<p align="center"> Artificial intelligence • local download</p>
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python&logoColor=white)](https://www.python.org/)
@@ -251,3 +251,4 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
 </table>
 
 </div>
+
