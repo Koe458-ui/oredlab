@@ -1,15 +1,26 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Ored AI</title>
-  <meta name="description" content="Ored AI — your AI assistant." />
-  <meta name="theme-color" content="#000000" />
-  <link rel="stylesheet" href="style.css" />
+  <meta name="description" content="Ored is an AI model built from scratch that runs locally on your PC. No cloud, no accounts." />
+  <meta name="theme-color" content="#f7f9fc" />
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
 
-  <!-- three.js from a CDN via an import map (no build tools needed).
-       Keep both URLs on the same version. -->
+  <script>
+    try {
+      const saved = localStorage.getItem('ored-theme');
+      const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    } catch (e) {}
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+
   <script type="importmap">
     {
       "imports": {
@@ -20,91 +31,125 @@
   </script>
 </head>
 <body>
-  <!-- Fixed full-screen 3D canvas behind everything -->
+
   <canvas id="scene" aria-hidden="true"></canvas>
 
-  <!-- Loading screen (hidden by main.js once robot.glb has loaded) -->
   <div id="loader" class="loader" role="status" aria-live="polite">
-    <div class="loader__brand">Ored AI</div>
+    <svg class="loader__mark" viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="3" />
+    </svg>
     <div class="loader__bar"><span id="loader-fill"></span></div>
     <p id="loader-text" class="loader__text">Loading 0%</p>
   </div>
 
-  <!-- ===================== HEADER ===================== -->
   <header class="header">
-    <a class="header__logo" href="#page-room" aria-label="Ored AI home">
+    <a class="header__logo" href="index.html" aria-label="Ored home">
       <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
-        <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="3" />
-        <circle cx="16" cy="16" r="4.5" fill="currentColor" />
+        <circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="3.5" />
       </svg>
-      <span>Ored AI</span>
+      <span>Ored</span>
     </a>
 
     <nav class="header__nav" aria-label="Main">
-      <a href="#chat">Chat</a>
-      <a href="#download" title="Available for Windows">
-        Download
-        <!-- Windows-only for now -->
-        <svg class="win-icon" viewBox="0 0 16 16" aria-label="Windows">
-          <path fill="currentColor" d="M0 2.2 6.5 1.3v6.2H0zm7.3-1L16 0v7.5H7.3zM0 8.3h6.5v6.3L0 13.7zm7.3 0H16V16l-8.7-1.2z" />
-        </svg>
-      </a>
-      <a href="#pricing">Pricing</a>
-      <a href="#policy">Policy</a>
+      <a href="chat.html">Chat</a>
+      <a href="download.html">Download</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="policy.html">Policy</a>
     </nav>
 
-    <button class="header__settings" type="button" aria-label="Settings">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path fill="currentColor" d="M19.14 12.94a7.5 7.5 0 0 0 .05-.94 7.5 7.5 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.630-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.84a.5.5 0 0 0-.49.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.67 8.48a.5.5 0 0 0 .12.64l2.03 1.58a7.5 7.5 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.04.24.25.42.49.42h3.840c.24 0 .45-.18.49-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.08.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z" />
-      </svg>
-    </button>
+    <div class="header__actions">
+      <button id="theme-toggle" class="icon-btn" type="button" aria-label="Switch to dark theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
+        </svg>
+      </button>
+      <a class="btn btn--outline btn--sm" href="#login">Login</a>
+    </div>
   </header>
-  
+
   <main class="story">
 
-    <!-- Room (scroll drives frames 0–100) -->
-    <section class="page" id="page-room">
+    <section class="page" id="home">
       <div class="col col--left reveal">
-        <h2>Text</h2>
-        <p>text text text text text text</p>
+        <p class="eyebrow">Ored 50M · Preview</p>
+        <h1>An AI that lives on your PC.</h1>
+        <p class="lead">Built from scratch, not a wrapper. Ored runs fully offline, so your prompts never leave your machine.</p>
       </div>
+
       <div class="col col--middle" aria-hidden="true"></div>
-      <div class="col col--right reveal">
-        <h2>Text</h2>
-        <p>text text text text text text</p>
+
+      <div class="col col--right reveal" id="features">
+        <p class="eyebrow">Under the hood</p>
+        <dl class="specs">
+          <div><dt>Parameters</dt><dd>~50M</dd></div>
+          <div><dt>Layers</dt><dd>13 × transformer</dd></div>
+          <div><dt>Context</dt><dd>1,024 tokens</dd></div>
+          <div><dt>Runs on</dt><dd>CPU · No GPU needed</dd></div>
+          <div><dt>Privacy</dt><dd>100% local</dd></div>
+        </dl>
       </div>
+
+      <a class="scroll-hint" href="#download" aria-label="Scroll to download">
+        <span></span>
+      </a>
     </section>
 
-    <!-- Music part (scroll drives frames 100–200) -->
-    <section class="page" id="page-music">
-      <div class="col col--left reveal">
-        <h2>Text</h2>
-        <p>text text text text text text</p>
-      </div>
-      <div class="col col--middle" aria-hidden="true"></div>
-      <div class="col col--right reveal">
-        <h2>Text</h2>
-        <p>text text text text text text</p>
-      </div>
-    </section>
+    <section class="page" id="download">
+      <article class="col col--left card reveal">
+        <span class="card__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 19h14" /></svg>
+        </span>
+        <div class="card__body">
+          <h2>Download</h2>
+          <p>Get Ored for your PC and run it locally. No internet required.</p>
+          <a class="btn btn--primary" href="https://github.com/Koe458-ui/oredlab/releases/latest">
+            <svg class="win-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M0 2.2 6.5 1.3v6.2H0zm7.3-1L16 0v7.5H7.3zM0 8.3h6.5v6.3L0 13.7zm7.3 0H16V16l-8.7-1.2z" />
+            </svg>
+            Download for Windows
+            <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </a>
+          <p class="meta">Windows 10/11 <span aria-hidden="true">•</span> 64-bit</p>
+        </div>
+      </article>
 
-    <!-- Activity (frames 200–920 loop automatically) -->
-    <section class="page" id="page-activity">
-      <div class="col col--left reveal">
-        <h2>Text</h2>
-        <p>text text text text text text</p>
-      </div>
       <div class="col col--middle" aria-hidden="true"></div>
-      <div class="col col--right reveal">
-        <h2>Text</h2>
-        <p>text text text text text text</p>
-      </div>
+
+      <article class="col col--right card reveal" id="chat">
+        <span class="card__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 12a8 7 0 1 1 3.5 5.8L4 19l1-3.4A6.7 6.7 0 0 1 4 12z" /></svg>
+        </span>
+        <div class="card__body">
+          <h2>Chat</h2>
+          <p>Talk to Ored, get answers, and bring your ideas to life.</p>
+          <a class="btn btn--outline" href="chat.html">
+            Start Chat
+            <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </a>
+        </div>
+      </article>
     </section>
 
   </main>
 
-  <!-- onerror catches a failed download of main.js or any of its three.js imports -->
-  <script type="module" src="main.js"
+  <footer class="footer">
+    <div id="about">
+      <h3>About</h3>
+      <p>Oredlab is an independent AI model, built in the open and free to run locally.</p>
+    </div>
+    <div id="contact">
+      <h3>Contact</h3>
+      <p><a href="https://github.com/Koe458-ui/oredlab">GitHub</a> · <a href="https://github.com/Koe458-ui/oredlab/issues">Open an issue</a></p>
+    </div>
+    <p class="footer__copy">© <span id="year"></span> Oredlab</p>
+  </footer>
+
+  <script type="module" src="js/site.js"></script>
+  <script type="module" src="js/main.js"
     onerror="document.getElementById('loader-text').textContent='Could not load the 3D engine. Check your internet connection.'"></script>
 </body>
 </html>
