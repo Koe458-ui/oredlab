@@ -1,0 +1,12 @@
+.git
+.github
+.githooks
+.gitignore
+ored
+Guide
+tools
+node_modules
+wrangler.jsonc
+.assetsignore
+*.md
+LICENSE
