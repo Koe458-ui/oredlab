@@ -5,76 +5,70 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const CONFIG = {
   modelUrl: './assets/robot.glb',
-  // Draco decoder files
   dracoPath: 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/',
   fps: 24,
 
-  frames: {
-    room:  { start: 0,   end: 100 }, // scroll-driven
-    music: { start: 100, end: 200 }, // scroll-driven
-    loop:  { start: 200, end: 920 }, // plays automatically (920 == 200, seamless)
+  pages: [
+    { id: 'home',     frame: 0,   camera: 'CAM_01_Room' },
+    { id: 'download', frame: 140, camera: 'CAM_02_Music' },
+  ],
 
-    // Sections inside the page-3 loop
-    groove:  { start: 200, end: 440 }, // headphones on, nods on the beat, sways, 360 spin
-    hpOff:   { start: 440, end: 468 }, // headphones open and lift off
-    pistol:  { start: 472, end: 582 }, // pistol docks on right ear, slow bursts
-    rifle:   { start: 586, end: 702 }, // assault rifle, slow 3-round bursts
-    sniper:  { start: 708, end: 862 }, // sniper, 3 heavy shots
-    hpOn:    { start: 866, end: 902 }, // headphones come back down and clamp on
+  frames: {
+    loop:  { start: 200, end: 920 },
+    groove:  { start: 200, end: 440 },
+    hpOff:   { start: 440, end: 468 },
+    pistol:  { start: 472, end: 582 },
+    rifle:   { start: 586, end: 702 },
+    sniper:  { start: 708, end: 862 },
+    hpOn:    { start: 866, end: 902 },
   },
 
-
-  loopEnterAt: 1.97,
-
+  loopEnterAt: Infinity,
   scrollSmoothing: 10,
-
   loopBlendSpeed: 4,
 
   camera: {
     fov: 35,
-    empties: ['CAM_01_Room', 'CAM_02_Music', 'CAM_03_Guns'],
     damping: 4,
     phoneFitWidth: 6.6,
     phoneFitMargin: 1.1,
     phoneMaxFov: 80,
   },
 
+  hideObjects: /^(Studio_Root|COVER_|TRACK_Platform)/,
+
   robotNodeName: null,
   robotCenterIgnore: /gun|flash|smoke|phone|cover|platform/i,
 
-  // Face / LED mood colours
   emissive: {
     materials: ['M_Emissive_Face', 'M_Emissive_Blue'],
-    colors: { cyan: '#1ac0ff', red: '#ff1f0a', green: '#0dff40' },
-    defaultColor: 'green',
-    // Which colour each section uses 
+    colors: { blue: '#2f7dff', cyan: '#1ac0ff', red: '#ff1f0a', green: '#0dff40' },
+    defaultColor: 'blue',
     moods: [
       { section: 'groove', color: 'cyan' },
       { section: 'pistol', color: 'red' },
       { section: 'rifle',  color: 'red' },
       { section: 'sniper', color: 'cyan' },
     ],
-
     glow: 2.0,
     beatEvery: 15,
     beatBoost: 0.9,
     colorBlendSpeed: 8,
   },
 
-  // Muzzle flashes: meshes named GUN_*_Flash with scale above threshold → warm light pulse
   flash: {
     namePattern: /^GUN_.*_Flash$/,
     scaleThreshold: 0.1,
     color: 0xffa64d,
     intensity: 40,
     distance: 8,
-    decay: 18, // fade speed after the flash mesh disappears (per second)
+    decay: 18,
   },
 
-  // White cover fade on 
   cover: {
     enabled: true,
     namePattern: /cover/i,
@@ -83,22 +77,23 @@ const CONFIG = {
 
   smoke: { namePattern: /smoke/i, maxOpacity: 0.65 },
 
-  bloom: { strength: 0.35, radius: 0.4, threshold: 1.0 },
+  bloom: { strength: 0.35, radius: 0.4, threshold: 1.5 },
 
   render: {
     exposure: 1.0,
     maxPixelRatio: 2,
     maxPixelRatioPhone: 1.5,
-    clearColor: 0x000000,
   },
 
   lights: {
-    hemisphere: 0.6,
-    key: 1.4,
+    environment: 0.9,
+    hemisphere: 0.4,
+    key: 1.2,
   },
 };
 
-const PAGE_COUNT = 3;
+const pageEls = CONFIG.pages.map((p) => document.getElementById(p.id));
+const PAGE_COUNT = pageEls.length;
 const IS_PHONE =
   window.matchMedia('(pointer: coarse)').matches &&
   Math.min(screen.width, screen.height) <= 820;
@@ -116,23 +111,24 @@ const revealObserver = new IntersectionObserver(
 document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
 
 const canvas = document.getElementById('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = CONFIG.render.exposure;
-renderer.setClearColor(CONFIG.render.clearColor, 1);
+renderer.setClearColor(0x000000, 0);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, innerWidth / innerHeight, 0.05, 500);
 
-// No background or environment image: everything you see comes from your GLB.
-// These two plain lights only make sure the model isn't pitch black.
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = CONFIG.lights.environment;
+pmrem.dispose();
 scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, CONFIG.lights.hemisphere));
 const keyLight = new THREE.DirectionalLight(0xffffff, CONFIG.lights.key);
 keyLight.position.set(3, 6, 5);
 scene.add(keyLight);
 
-// Composer renders into a multisampled HDR target so we keep anti-aliasing with bloom
 const composerTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
 const composer = new EffectComposer(renderer, composerTarget);
 composer.addPass(new RenderPass(scene, camera));
@@ -142,8 +138,15 @@ const bloomPass = new UnrealBloomPass(
   CONFIG.bloom.radius,
   CONFIG.bloom.threshold
 );
+Object.assign(bloomPass.blendMaterial, {
+  blending: THREE.CustomBlending,
+  blendSrc: THREE.OneFactor,
+  blendDst: THREE.OneFactor,
+  blendSrcAlpha: THREE.ZeroFactor,
+  blendDstAlpha: THREE.OneFactor,
+});
 composer.addPass(bloomPass);
-composer.addPass(new OutputPass()); // tone mapping + sRGB
+composer.addPass(new OutputPass());
 
 function resize() {
   const w = innerWidth;
@@ -160,26 +163,30 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-
 const clamp01 = (v) => Math.min(Math.max(v, 0), 1);
 const lerp = (a, b, t) => a + (b - a) * t;
 const smoothstep = (t) => t * t * (3 - 2 * t);
-// Frame-rate independent exponential smoothing
 const dampFactor = (lambda, dt) => 1 - Math.exp(-lambda * dt);
 const inRange = (frame, r) => frame >= r.start && frame < r.end;
 const frameToTime = (frame) => frame / CONFIG.fps;
 
 function scrollProgress() {
-  const max = document.documentElement.scrollHeight - innerHeight;
-  if (max <= 0) return 0;
-  return clamp01(window.scrollY / max) * (PAGE_COUNT - 1);
+  const y = window.scrollY;
+  for (let i = PAGE_COUNT - 1; i > 0; i--) {
+    const top = pageEls[i].offsetTop;
+    if (y >= top) return PAGE_COUNT - 1;
+    const prevTop = pageEls[i - 1].offsetTop;
+    if (y >= prevTop) return i - 1 + clamp01((y - prevTop) / (top - prevTop));
+  }
+  return 0;
 }
 
-/** The animation frame that matches the current scroll position */
+const pageIndex = (progress) => Math.max(0, Math.min(Math.floor(progress), PAGE_COUNT - 2));
+
 function scrollFrameFor(progress) {
-  const { room, music } = CONFIG.frames;
-  if (progress < 1) return lerp(room.start, room.end, progress);
-  return lerp(music.start, music.end, clamp01(progress - 1));
+  if (PAGE_COUNT < 2) return CONFIG.pages[0].frame;
+  const i = pageIndex(progress);
+  return lerp(CONFIG.pages[i].frame, CONFIG.pages[i + 1].frame, clamp01(progress - i));
 }
 
 function findObject(root, test) {
@@ -202,30 +209,32 @@ function setLoadProgress(fraction) {
   loaderText.textContent = `Loading ${pct}%`;
 }
 
-/* ---------------------------------------------------------
-   State
-   --------------------------------------------------------- */
 const state = {
   ready: false,
-  scrollFrame: 0, // smoothed scroll-driven frame
-  loopFrame: CONFIG.frames.loop.start, // auto-playing frame on page 3
-  loopWeight: 0, // 0 = scroll animation, 1 = loop animation
+  scrollFrame: 0,
+  loopFrame: CONFIG.frames.loop.start,
+  loopWeight: 0,
   inLoop: false,
-  frame: 0, // the frame that "wins" right now (used for effects)
+  frame: 0,
 };
 
 let mixer, scrollAction, loopAction;
 let robotNode = null;
-const robotCenterLocal = new THREE.Vector3(); // robot centre in robotNode's local space
+const robotCenterLocal = new THREE.Vector3();
 const cameraEmpties = [];
 const emissiveMaterials = [];
-const flashes = []; // { mesh, light, level }
-const coverMaterials = []; // { material, baseOpacity }
+const flashes = [];
+const coverMaterials = [];
+
+function colorCover() {
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  for (const c of coverMaterials) c.material.color.set(bg);
+}
+window.addEventListener('ored-theme', colorCover);
 
 const moodColor = new THREE.Color(CONFIG.emissive.colors[CONFIG.emissive.defaultColor]);
 const moodTarget = new THREE.Color();
 
-// Camera smoothing state
 const camPos = new THREE.Vector3();
 const camLook = new THREE.Vector3();
 const tmpTarget = new THREE.Vector3();
@@ -234,9 +243,6 @@ const tmpA = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
 const FALLBACK_CAMERA_OFFSET = new THREE.Vector3(0, 0.6, 9);
 
-/* ---------------------------------------------------------
-   Load the GLB
-   --------------------------------------------------------- */
 const draco = new DRACOLoader().setDecoderPath(CONFIG.dracoPath);
 const gltfLoader = new GLTFLoader().setDRACOLoader(draco);
 
@@ -264,11 +270,8 @@ gltfLoader.load(
 function setupModel(gltf) {
   const model = gltf.scene;
   scene.add(model);
-  // Note: cameras inside the GLB are ignored on purpose — the camera is driven from JS.
 
   model.traverse((obj) => {
-    // Muzzle flashes → one pre-created point light each (intensity 0 until fired).
-    // Creating lights up front avoids shader recompiles mid-animation.
     if (CONFIG.flash.namePattern.test(obj.name)) {
       const light = new THREE.PointLight(CONFIG.flash.color, 0, CONFIG.flash.distance, 2);
       scene.add(light);
@@ -277,14 +280,12 @@ function setupModel(gltf) {
 
     if (!obj.isMesh) return;
 
-    // Face / LED materials
     for (const mat of materialsOf(obj)) {
       if (CONFIG.emissive.materials.includes(mat.name) && !emissiveMaterials.includes(mat)) {
         emissiveMaterials.push(mat);
       }
     }
 
-    // Smoke: transparent, no depth writes, drawn after opaque objects
     if (CONFIG.smoke.namePattern.test(obj.name)) {
       for (const mat of materialsOf(obj)) {
         mat.transparent = true;
@@ -296,12 +297,10 @@ function setupModel(gltf) {
       obj.renderOrder = 10;
     }
 
-    // Any other blended material: don't write depth, so things behind it still show
     for (const mat of materialsOf(obj)) {
       if (mat.transparent) mat.depthWrite = false;
     }
 
-    // White cover (opacity driven from code, see updateCover)
     if (CONFIG.cover.enabled && CONFIG.cover.namePattern.test(obj.name)) {
       for (const mat of materialsOf(obj)) {
         coverMaterials.push({ material: mat, baseOpacity: mat.opacity });
@@ -310,17 +309,18 @@ function setupModel(gltf) {
       }
       obj.renderOrder = 5;
     }
-
   });
 
-  // Camera reference empties
-  for (const name of CONFIG.camera.empties) {
+  if (CONFIG.hideObjects) {
+    model.traverse((obj) => { if (CONFIG.hideObjects.test(obj.name)) obj.visible = false; });
+  }
+
+  for (const { camera: name } of CONFIG.pages) {
     const empty = model.getObjectByName(name);
     if (!empty) console.warn(`Camera empty "${name}" not found in the GLB.`);
     cameraEmpties.push(empty || null);
   }
 
-  // Robot node the camera keeps centred
   robotNode = CONFIG.robotNodeName
     ? model.getObjectByName(CONFIG.robotNodeName)
     : findObject(model, (o) => /robot|head/i.test(o.name) && !/phone/i.test(o.name));
@@ -329,7 +329,6 @@ function setupModel(gltf) {
     robotNode = model;
   }
 
-  // Animation: one clip, two actions (scroll + loop) so we can crossfade between them
   const clip = gltf.animations[0];
   mixer = new THREE.AnimationMixer(model);
   if (clip) {
@@ -337,26 +336,25 @@ function setupModel(gltf) {
     loopAction = mixer.clipAction(clip.clone());
     for (const action of [scrollAction, loopAction]) {
       action.play();
-      action.paused = true; // we set action.time ourselves every frame
+      action.paused = true;
     }
   } else {
     console.warn('No animation clip found in the GLB.');
   }
 
-  // Start at whatever the current scroll position is (browsers restore scroll on reload)
+  colorCover();
+
   const p = scrollProgress();
   state.scrollFrame = scrollFrameFor(p);
   state.inLoop = p >= CONFIG.loopEnterAt;
   state.loopWeight = state.inLoop ? 1 : 0;
   applyAnimation();
 
-  // Remember where the robot's centre is relative to its node, so tracking it each frame is cheap
   const box = robotBounds();
   if (box.isEmpty()) robotNode.getWorldPosition(tmpA);
   else box.getCenter(tmpA);
   robotCenterLocal.copy(robotNode.worldToLocal(tmpA.clone()));
 
-  // Place the camera immediately (no easing in from the origin)
   computeCameraGoal(p, tmpDesired, tmpTarget);
   camPos.copy(tmpDesired);
   camLook.copy(tmpTarget);
@@ -367,7 +365,6 @@ function setupModel(gltf) {
     '| emissive materials:', emissiveMaterials.map((m) => m.name), '| cover materials:', coverMaterials.length);
 }
 
-/** World-space box of the robot's own meshes (guns, headphones, smoke etc. excluded). */
 function robotBounds() {
   const box = new THREE.Box3();
   const meshBox = new THREE.Box3();
@@ -382,27 +379,21 @@ function robotBounds() {
   return box;
 }
 
-/* ---------------------------------------------------------
-   Animation (scroll-driven pages 1–2, loop on page 3)
-   --------------------------------------------------------- */
 function updateAnimationState(dt) {
   const { loop } = CONFIG.frames;
   const progress = scrollProgress();
 
-  // Pages 1–2: smoothly follow the scroll position
   state.scrollFrame = lerp(state.scrollFrame, scrollFrameFor(progress), dampFactor(CONFIG.scrollSmoothing, dt));
 
-  // Page 3: auto-play 200 → 920 and wrap back to 200 (seamless)
   state.inLoop = progress >= CONFIG.loopEnterAt;
   if (reducedMotionQuery.matches) {
-    state.loopFrame = loop.start; // hold the first loop frame
+    state.loopFrame = loop.start;
   } else if (state.inLoop || state.loopWeight > 0.001) {
     state.loopFrame += dt * CONFIG.fps;
     const length = loop.end - loop.start;
     while (state.loopFrame >= loop.end) state.loopFrame -= length;
   }
 
-  // Crossfade between the two. Once fully faded out, reset so the loop restarts at 200 next time.
   const goal = state.inLoop ? 1 : 0;
   state.loopWeight = lerp(state.loopWeight, goal, dampFactor(CONFIG.loopBlendSpeed, dt));
   if (Math.abs(state.loopWeight - goal) < 0.001) state.loopWeight = goal;
@@ -418,13 +409,10 @@ function applyAnimation() {
   loopAction.time = frameToTime(state.loopFrame);
   scrollAction.setEffectiveWeight(1 - state.loopWeight);
   loopAction.setEffectiveWeight(state.loopWeight);
-  mixer.update(0); // evaluate at the times we just set
+  mixer.update(0);
   scene.updateMatrixWorld();
 }
 
-/* ---------------------------------------------------------
-   Camera: positions from the Blender empties, always looking at the robot
-   --------------------------------------------------------- */
 function robotCenter(out) {
   return robotNode.localToWorld(out.copy(robotCenterLocal));
 }
@@ -432,27 +420,25 @@ function robotCenter(out) {
 function emptyPosition(index, out, target) {
   const empty = cameraEmpties[index];
   if (empty) return empty.getWorldPosition(out);
-  return out.copy(target).add(FALLBACK_CAMERA_OFFSET); // used if an empty is missing
+  return out.copy(target).add(FALLBACK_CAMERA_OFFSET);
 }
 
-/** Desired camera position + look target for a given scroll progress. */
 function computeCameraGoal(progress, outPos, outTarget) {
   robotCenter(outTarget);
 
-  // Blend between the two neighbouring page positions
-  const i = Math.min(Math.floor(progress), PAGE_COUNT - 2);
-  const t = smoothstep(clamp01(progress - i));
-  emptyPosition(i, tmpA, outTarget);
-  emptyPosition(i + 1, tmpB, outTarget);
-  outPos.lerpVectors(tmpA, tmpB, t);
+  if (PAGE_COUNT < 2) {
+    emptyPosition(0, outPos, outTarget);
+  } else {
+    const i = pageIndex(progress);
+    const t = smoothstep(clamp01(progress - i));
+    emptyPosition(i, tmpA, outTarget);
+    emptyPosition(i + 1, tmpB, outTarget);
+    outPos.lerpVectors(tmpA, tmpB, t);
+  }
 
   fitPortrait(outPos, outTarget);
 }
 
-/**
- * Portrait phones: make the robot + docked gun fit the screen width.
- * First widen the field of view; if that hits phoneMaxFov, also move the camera back.
- */
 function fitPortrait(pos, target) {
   const cfg = CONFIG.camera;
   let fov = cfg.fov;
@@ -460,7 +446,6 @@ function fitPortrait(pos, target) {
     const halfWidth = cfg.phoneFitWidth * 0.5 * cfg.phoneFitMargin;
     const offset = tmpA.subVectors(pos, target);
     const dist = offset.length();
-    // Vertical FOV whose horizontal FOV exactly fits halfWidth at this distance
     const tanHalfH = halfWidth / dist;
     fov = THREE.MathUtils.radToDeg(2 * Math.atan(tanHalfH / camera.aspect));
     if (fov > cfg.phoneMaxFov) {
@@ -485,9 +470,6 @@ function updateCamera(dt) {
   camera.lookAt(camLook);
 }
 
-/* ---------------------------------------------------------
-   Effects: mood colour, muzzle flashes, cover fade
-   --------------------------------------------------------- */
 function moodColorName(frame) {
   for (const mood of CONFIG.emissive.moods) {
     if (inRange(frame, CONFIG.frames[mood.section])) return mood.color;
@@ -503,11 +485,9 @@ function updateEmissive(dt) {
   moodTarget.set(cfg.colors[moodColorName(frame)]);
   moodColor.lerp(moodTarget, dampFactor(cfg.colorBlendSpeed, dt));
 
-  // Normalise brightness so every colour glows about the same through the bloom
   const lum = Math.max(0.05, 0.2126 * moodColor.r + 0.7152 * moodColor.g + 0.0722 * moodColor.b);
   let intensity = cfg.glow / lum;
 
-  // Beat pulse every N frames while grooving (sharp attack, quick decay)
   if (state.loopWeight > 0.5 && inRange(frame, CONFIG.frames.groove)) {
     const phase = ((frame - CONFIG.frames.groove.start) % cfg.beatEvery) / cfg.beatEvery;
     intensity *= 1 + cfg.beatBoost * Math.pow(1 - phase, 3);
@@ -538,7 +518,7 @@ function updateCover() {
   const fade = smoothstep(clamp01((state.frame - start) / (end - start)));
   for (const c of coverMaterials) {
     c.material.opacity = c.baseOpacity * fade;
-    c.material.depthWrite = fade > 0.99; // solid once fully faded in
+    c.material.depthWrite = fade > 0.99;
     c.material.visible = fade > 0.001;
   }
 }
@@ -546,7 +526,7 @@ function updateCover() {
 const clock = new THREE.Clock();
 
 function tick() {
-  const dt = Math.min(clock.getDelta(), 0.1); // avoid big jumps after stalls
+  const dt = Math.min(clock.getDelta(), 0.1);
   updateAnimationState(dt);
   updateCamera(dt);
   updateEmissive(dt);
@@ -557,7 +537,7 @@ function tick() {
 
 function startLoop() {
   if (!state.ready || document.hidden) return;
-  clock.getDelta(); // discard the time spent hidden
+  clock.getDelta();
   renderer.setAnimationLoop(tick);
 }
 
@@ -567,5 +547,4 @@ function stopLoop() {
 
 document.addEventListener('visibilitychange', () => (document.hidden ? stopLoop() : startLoop()));
 
-// Handy for tweaking in the browser console: ORED.CONFIG.bloom.strength = 0.5 etc.
 window.ORED = { CONFIG, state, scene, camera, bloomPass };
