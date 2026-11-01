@@ -2,7 +2,7 @@
   <img src="./assets/logo.svg" width="120" alt="Logo">
 </p>
 
-<h1 align="center">Oredlab</h1>
+<h1 align="center">Oredlab </h1>
 <p align="center"> Artificial intelligence • local download</p>
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
