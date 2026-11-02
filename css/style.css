@@ -310,6 +310,49 @@ h1 {
 .reveal-ready .col--left.reveal { transform: translateX(-32px); }
 .reveal-ready .col--right.reveal { transform: translateX(32px); transition-delay: 0.1s; }
 .reveal-ready .reveal.is-visible { opacity: 1; transform: none; }
+.page--download,
+.story ~ .footer {
+  --bg: #ffffff;
+  --text: #0f1729;
+  --text-dim: #5b6478;
+  --line: #dfe5ef;
+  --accent: #3b6ef5;
+  --accent-hover: #2d5de0;
+  --accent-soft: #e8efff;
+  color: var(--text);
+  color-scheme: light;
+}
+
+.page--download {
+  align-content: center;
+  row-gap: clamp(28px, 5vw, 64px);
+  background: #ffffff;
+  border-radius: clamp(24px, 3vw, 48px) clamp(24px, 3vw, 48px) 0 0;
+  box-shadow: 0 -16px 48px rgba(15, 23, 41, 0.16);
+  overflow-x: clip;
+}
+
+.story ~ .footer {
+  background: #ffffff;
+  border-top: 0;
+}
+
+.download-gif {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.download-gif__img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: min(48vh, 480px);
+  border-radius: 16px;
+}
 
 @media (max-width: 1100px) {
   .header__logo { font-size: 24px; }
@@ -370,9 +413,41 @@ h1 {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  @media (max-width: 900px) {
+  .page--download {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    align-items: start;
+    row-gap: 28px;
+  }
+  .page--download .col--middle { display: none; }
+  .page--download .col--left,
+  .page--download .col--right { align-self: start; min-width: 0; }
+  .page--download .card { flex-direction: row; gap: 14px; }
+  .page--download .card__body { min-width: 0; }
+  .page--download .btn { max-width: 100%; }
+
+  .reveal-ready .page--download .col--left.reveal { transform: translateX(-28px); }
+  .reveal-ready .page--download .col--right.reveal { transform: translateX(28px); }
+  .reveal-ready .page--download .reveal.is-visible { opacity: 1; transform: none; }
+}
+
+@media (max-width: 400px) {
+  .page--download .btn {
+    white-space: normal;
+    height: auto;
+    min-height: 46px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    line-height: 1.25;
+  }
+}
   html { scroll-behavior: auto; }
   .reveal-ready .reveal,
   .reveal-ready .col--left.reveal,
-  .reveal-ready .col--right.reveal { transform: none; transition: opacity 0.4s ease; }
+    .reveal-ready .col--right.reveal,
+  .reveal-ready .page--download .col--left.reveal,
+  .reveal-ready .page--download .col--right.reveal { transform: none; transition: opacity 0.4s ease; }
   .loader__mark, .scroll-hint span { animation: none; }
 }
