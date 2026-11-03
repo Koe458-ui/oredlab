@@ -27,9 +27,7 @@ const CONFIG = {
     hpOn:    { start: 866, end: 902 },
   },
 
-  loopEnterAt: Infinity,
-  scrollSmoothing: 10,
-  loopBlendSpeed: 4,
+  loopBlendFrames: 12,
 
   camera: {
     fov: 35,
@@ -211,14 +209,12 @@ function setLoadProgress(fraction) {
 
 const state = {
   ready: false,
-  scrollFrame: 0,
   loopFrame: CONFIG.frames.loop.start,
-  loopWeight: 0,
-  inLoop: false,
-  frame: 0,
+  loopWeight: 1,
+  frame: CONFIG.frames.loop.start,
 };
 
-let mixer, scrollAction, loopAction;
+let mixer, wrapAction, loopAction;
 let robotNode = null;
 const robotCenterLocal = new THREE.Vector3();
 const cameraEmpties = [];
@@ -241,6 +237,8 @@ const tmpTarget = new THREE.Vector3();
 const tmpDesired = new THREE.Vector3();
 const tmpA = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
+const fixedPosition = new THREE.Vector3();
+const fixedTarget = new THREE.Vector3();
 const FALLBACK_CAMERA_OFFSET = new THREE.Vector3(0, 0.6, 9);
 
 const draco = new DRACOLoader().setDecoderPath(CONFIG.dracoPath);
@@ -332,9 +330,9 @@ function setupModel(gltf) {
   const clip = gltf.animations[0];
   mixer = new THREE.AnimationMixer(model);
   if (clip) {
-    scrollAction = mixer.clipAction(clip);
+    wrapAction = mixer.clipAction(clip);
     loopAction = mixer.clipAction(clip.clone());
-    for (const action of [scrollAction, loopAction]) {
+    for (const action of [wrapAction, loopAction]) {
       action.play();
       action.paused = true;
     }
@@ -344,10 +342,6 @@ function setupModel(gltf) {
 
   colorCover();
 
-  const p = scrollProgress();
-  state.scrollFrame = scrollFrameFor(p);
-  state.inLoop = p >= CONFIG.loopEnterAt;
-  state.loopWeight = state.inLoop ? 1 : 0;
   applyAnimation();
 
   const box = robotBounds();
@@ -355,7 +349,10 @@ function setupModel(gltf) {
   else box.getCenter(tmpA);
   robotCenterLocal.copy(robotNode.worldToLocal(tmpA.clone()));
 
-  computeCameraGoal(p, tmpDesired, tmpTarget);
+  robotCenter(fixedTarget);
+  emptyPosition(0, fixedPosition, fixedTarget);
+
+  computeCameraGoal(tmpDesired, tmpTarget);
   camPos.copy(tmpDesired);
   camLook.copy(tmpTarget);
   camera.position.copy(camPos);
@@ -381,34 +378,27 @@ function robotBounds() {
 
 function updateAnimationState(dt) {
   const { loop } = CONFIG.frames;
-  const progress = scrollProgress();
 
-  state.scrollFrame = lerp(state.scrollFrame, scrollFrameFor(progress), dampFactor(CONFIG.scrollSmoothing, dt));
-
-  state.inLoop = progress >= CONFIG.loopEnterAt;
   if (reducedMotionQuery.matches) {
     state.loopFrame = loop.start;
-  } else if (state.inLoop || state.loopWeight > 0.001) {
+  } else {
     state.loopFrame += dt * CONFIG.fps;
-    const length = loop.end - loop.start;
-    while (state.loopFrame >= loop.end) state.loopFrame -= length;
+    if (state.loopFrame >= loop.end) state.loopFrame -= loop.end - loop.start - CONFIG.loopBlendFrames;
   }
-
-  const goal = state.inLoop ? 1 : 0;
-  state.loopWeight = lerp(state.loopWeight, goal, dampFactor(CONFIG.loopBlendSpeed, dt));
-  if (Math.abs(state.loopWeight - goal) < 0.001) state.loopWeight = goal;
-  if (state.loopWeight === 0) state.loopFrame = loop.start;
 
   applyAnimation();
 }
 
 function applyAnimation() {
-  state.frame = state.loopWeight > 0.5 ? state.loopFrame : state.scrollFrame;
-  if (!scrollAction) return;
-  scrollAction.time = frameToTime(state.scrollFrame);
+  const { loop } = CONFIG.frames;
+  state.frame = state.loopFrame;
+  if (!wrapAction) return;
+  const blendStart = loop.end - CONFIG.loopBlendFrames;
+  const wrapWeight = smoothstep(clamp01((state.loopFrame - blendStart) / CONFIG.loopBlendFrames));
   loopAction.time = frameToTime(state.loopFrame);
-  scrollAction.setEffectiveWeight(1 - state.loopWeight);
-  loopAction.setEffectiveWeight(state.loopWeight);
+  wrapAction.time = frameToTime(loop.start + Math.max(0, state.loopFrame - blendStart));
+  loopAction.setEffectiveWeight(1 - wrapWeight);
+  wrapAction.setEffectiveWeight(wrapWeight);
   mixer.update(0);
   scene.updateMatrixWorld();
 }
@@ -423,19 +413,9 @@ function emptyPosition(index, out, target) {
   return out.copy(target).add(FALLBACK_CAMERA_OFFSET);
 }
 
-function computeCameraGoal(progress, outPos, outTarget) {
-  robotCenter(outTarget);
-
-  if (PAGE_COUNT < 2) {
-    emptyPosition(0, outPos, outTarget);
-  } else {
-    const i = pageIndex(progress);
-    const t = smoothstep(clamp01(progress - i));
-    emptyPosition(i, tmpA, outTarget);
-    emptyPosition(i + 1, tmpB, outTarget);
-    outPos.lerpVectors(tmpA, tmpB, t);
-  }
-
+function computeCameraGoal(outPos, outTarget) {
+  outTarget.copy(fixedTarget);
+  outPos.copy(fixedPosition);
   fitPortrait(outPos, outTarget);
 }
 
