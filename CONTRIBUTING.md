@@ -31,6 +31,7 @@ If you want to contribute code:
 5. Commit your changes with a clear message.
 6. Push your branch to your fork.
 7. Open a pull request to the main Oredlab repository.
+8. Mention all details in PR (read "pull request" section for more details )
 
 ## Before Submitting
 
