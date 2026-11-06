@@ -246,7 +246,7 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
   </tr>
   <tr>
     <td align="center"><b>ChatGPT</b> (OpenAI)</td>
-    <td>Helped fix errors in the code</td>
+    <td>Helps fix errors in the code</td>
   </tr>
 </table>
 
