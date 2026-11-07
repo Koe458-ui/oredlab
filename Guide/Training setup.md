@@ -186,3 +186,5 @@ python scripts/checkpoints.py list --run ored50m
 ```
 
 This uploads it once. It doesn't keep uploading by itself while training, so do this every time u finish.
+
+Ask me (KOE) , if you have any doubts on set uping the ai 
