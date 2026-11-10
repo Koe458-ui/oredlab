@@ -8,7 +8,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const CONFIG = {
-  modelUrl: './assets/robot.glb',
+  modelUrl: './assets/robo%20web.glb',
   dracoPath: 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/',
   fps: 24,
 
