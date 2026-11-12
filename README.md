@@ -249,7 +249,7 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
     <td>Helps fix errors in the code</td>
   </tr>
   <tr>
-    <td align="center"><b>Hugging Face</b> (OpenAI)</td>
+    <td align="center"><b>Hugging Face</b> (Open source)</td>
     <td>Helps in data collection</td>
   </tr>
 </table>
