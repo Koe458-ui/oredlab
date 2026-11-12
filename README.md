@@ -233,7 +233,7 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
 
 <h2>🙏 Acknowledgments</h2>
 
-<p>A huge thank you to the AI tools that helped make ored possible:</p>
+<p>A huge thank you to the all the online source tools that helped make ored possible:</p>
 
 <table>
   <tr>
@@ -247,6 +247,10 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
   <tr>
     <td align="center"><b>ChatGPT</b> (OpenAI)</td>
     <td>Helps fix errors in the code</td>
+  </tr>
+  <tr>
+    <td align="center"><b>Hugging Face</b> (OpenAI)</td>
+    <td>Helps in data collection</td>
   </tr>
 </table>
 
