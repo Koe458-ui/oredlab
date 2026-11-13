@@ -252,6 +252,10 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
     <td align="center"><b>Hugging Face</b> (Open source)</td>
     <td>Helps in data collection</td>
   </tr>
+  <tr>
+    <td align="center"><b>Edu web</b> (Hugging face)</td>
+    <td>Training data collection</td>
+  </tr>
 </table>
 
 </div>
