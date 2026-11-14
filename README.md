@@ -233,7 +233,7 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
 
 <h2>🙏 Acknowledgments</h2>
 
-<p>A huge thank you to the all the online source tools that helped make ored possible:</p>
+<p>A huge thank you to the all the online source tools that helped make ored AI possible :</p>
 
 <table>
   <tr>
