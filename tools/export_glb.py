@@ -1,3 +1,5 @@
+#this file is for the glb file in website 
+
 import os
 import bpy
 
