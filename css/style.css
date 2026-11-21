@@ -161,3 +161,25 @@ body {
     border-radius: 35px;
   }
 }
+.hero-content { overflow: auto; }
+
+.banner-2 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 87.7%;
+  height: 87.7%;
+  z-index: 1;
+  padding: 8% 0;
+  background: #fcf6f5;
+  color: #606060;
+  border: 2px solid;
+  border-radius: 8px;
+  box-shadow: 7px 7px #fcf6f5, 8px 8px #606060,
+              15px 15px #fcf6f5, 16px 16px #606060;
+  font-family: Arial, sans-serif;
+}
+
+.banner-2 h2 { margin: 0 8% 4%; font-size: clamp(24px, 4vw, 54px); }
+.banner-2 strong { display: block; padding: 2% 8%; background: #d6ed17; }
+]
