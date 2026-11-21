@@ -428,3 +428,15 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .tape, .reel { animation: none; }
 }
+
+.retro-banner::after {
+  content: "";
+  position: absolute;
+  left: -4.5%;
+  top: 106.7%;
+  translate: -50% -50%;
+  width: 67%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #d33d9a;
+}
