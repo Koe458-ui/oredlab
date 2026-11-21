@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import torch
-
 from ored.config import load_config
 from ored.models.registry import build_model
 
