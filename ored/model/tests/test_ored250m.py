@@ -13,7 +13,9 @@ def test_250m_config_builds_the_expected_architecture():
     with torch.device("meta"):
         model = build_model(cfg, vocab_size=cfg.data.vocab_size)
 
-    assert model.num_parameters() == cfg.model.expected_parameters == EXPECTED_PARAMETERS
+    assert (
+        model.num_parameters() == cfg.model.expected_parameters == EXPECTED_PARAMETERS
+    )
     assert model.embeddings_tied
     assert model.attention == "sdpa"
     assert model.gradient_checkpointing
