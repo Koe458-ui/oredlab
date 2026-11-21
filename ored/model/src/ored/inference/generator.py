@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+
 
 import torch
 import torch.nn.functional as F
@@ -18,8 +18,8 @@ def generate_tokens(
     top_k: int = 0,
     top_p: float = 0.0,
     greedy: bool = False,
-    stop_ids: Optional[List[int]] = None,
-    banned_ids: Optional[List[int]] = None,
+    stop_ids: list[int] | None = None,
+    banned_ids: list[int] | None = None,
 ) -> torch.Tensor:
     if ids.dim() != 2 or ids.size(0) != 1:
         raise ValueError(f"expected ids of shape (1, T), got {tuple(ids.shape)}")
@@ -55,7 +55,9 @@ def generate_tokens(
                 remove = cumulative - torch.softmax(ordered, dim=-1) > top_p
                 remove[:, 0] = False
                 ordered = ordered.masked_fill(remove, float("-inf"))
-                logits = torch.full_like(logits, float("-inf")).scatter(1, order, ordered)
+                logits = torch.full_like(logits, float("-inf")).scatter(
+                    1, order, ordered
+                )
 
             probabilities = F.softmax(logits, dim=-1)
             next_id = torch.multinomial(probabilities, num_samples=1)
@@ -68,7 +70,7 @@ def generate_tokens(
     return ids
 
 
-def newline_ids(tokenizer: Tokenizer) -> List[int]:
+def newline_ids(tokenizer: Tokenizer) -> list[int]:
     return [i for i in range(tokenizer.vocab_size) if "\n" in tokenizer.decode([i])]
 
 
@@ -100,7 +102,9 @@ def generate_text(
         top_p=top_p,
         greedy=greedy,
         stop_ids=stop_ids,
-        banned_ids=[i for i in range(tokenizer.vocab_size) if not tokenizer.is_known(i)],
+        banned_ids=[
+            i for i in range(tokenizer.vocab_size) if not tokenizer.is_known(i)
+        ],
     )
     return tokenizer.decode(out[0].tolist())
 
@@ -123,5 +127,5 @@ def complete(
         greedy=True,
         stop_on_newline=True,
     )
-    continuation = text[len(prompt):]
+    continuation = text[len(prompt) :]
     return continuation.split("\n")[0].strip()

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import List, Optional
+
 
 from ored.learning.dataset import DEFAULT_EXPORT_DIR, DatasetError, DatasetSpec, export
 from ored.learning.store import StoreError
@@ -11,7 +11,7 @@ from ored.utils.logging_utils import get_logger, section
 logger = get_logger(__name__)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Turn approved learning data into a training dataset.",
         epilog="Reads ORED_SB_URL and ORED_SB_SERVICE_KEY from the environment.",

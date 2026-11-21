@@ -8,7 +8,7 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ored.learning.checkpoints import CheckpointStore
 from ored.learning.online import (
@@ -28,8 +28,7 @@ MAX_BODY_BYTES = 64 * 1024
 
 
 class OredHandler(BaseHTTPRequestHandler):
-
-    learner: Optional[OnlineLearner] = None
+    learner: OnlineLearner | None = None
     api_key: str = ""
     lock = threading.Lock()
     protocol_version = "HTTP/1.1"
@@ -37,7 +36,7 @@ class OredHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args: Any) -> None:
         logger.info("%s - %s" % (self.address_string(), fmt % args))
 
-    def _send(self, payload: Dict[str, Any], status: int = 200) -> None:
+    def _send(self, payload: dict[str, Any], status: int = 200) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("content-type", "application/json")
@@ -50,7 +49,9 @@ class OredHandler(BaseHTTPRequestHandler):
         if not self.api_key:
             return True
         header = self.headers.get("authorization") or ""
-        return hmac.compare_digest(header.encode("utf-8"), ("Bearer " + self.api_key).encode("utf-8"))
+        return hmac.compare_digest(
+            header.encode("utf-8"), ("Bearer " + self.api_key).encode("utf-8")
+        )
 
     def do_GET(self) -> None:
         if self.path.rstrip("/") != "/health":
@@ -86,17 +87,19 @@ class OredHandler(BaseHTTPRequestHandler):
             reply, learned = self.learner.respond(message)
             stats = self.learner.stats.as_dict()
 
-        self._send({
-            "reply": reply,
-            "model_version": self.learner.version,
-            "learned": learned.learned,
-            "learned_skipped_because": learned.reason,
-            "loss": learned.loss,
-            "online": stats,
-        })
+        self._send(
+            {
+                "reply": reply,
+                "model_version": self.learner.version,
+                "learned": learned.learned,
+                "learned_skipped_because": learned.reason,
+                "loss": learned.loss,
+                "online": stats,
+            }
+        )
 
 
-def build_remote(run_name: str) -> Optional[RemoteCheckpoints]:
+def build_remote(run_name: str) -> RemoteCheckpoints | None:
     try:
         return RemoteCheckpoints(
             store=SupabaseStore.from_env(),
@@ -139,7 +142,7 @@ def build_server(
     policy: OnlinePolicy,
     live_dir: str,
     api_key: str,
-    remote: Optional[RemoteCheckpoints] = None,
+    remote: RemoteCheckpoints | None = None,
 ) -> ThreadingHTTPServer:
     if remote is not None:
         live = Path(live_dir) / "live.pt"
@@ -160,7 +163,7 @@ def build_server(
     return ThreadingHTTPServer((host, port), OredHandler)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Serve Ored and learn from every message it is sent.",
         epilog="Point ORED_API_URL at this server. ORED_API_KEY is read from the environment.",
@@ -177,8 +180,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--no-learning", action="store_true")
     parser.add_argument("--remote-checkpoints", action="store_true")
     parser.add_argument("--run-name", default="live")
-    parser.add_argument("--insecure-no-key", action="store_true",
-                        help="allow serving on a non-loopback address without ORED_API_KEY")
+    parser.add_argument(
+        "--insecure-no-key",
+        action="store_true",
+        help="allow serving on a non-loopback address without ORED_API_KEY",
+    )
     args = parser.parse_args(argv)
 
     api_key = os.environ.get("ORED_API_KEY", "")

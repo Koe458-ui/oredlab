@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 import torch
-
 from ored.training.tasks import TASK_REGISTRY, LanguageModelTask, build_task
 from ored.training.trainer import Trainer
 from ored.utils.checkpoint import load_checkpoint
@@ -43,8 +42,9 @@ def test_language_model_beats_random_guessing(tiny_corpus):
     vocab_size = trainer.task.tokenizer.vocab_size
     uninformed_bpc = math.log2(vocab_size)
     final_bpc = trainer.history[-1]["val_bpc"]
-    assert final_bpc < uninformed_bpc, \
+    assert final_bpc < uninformed_bpc, (
         f"bpc {final_bpc:.2f} is no better than guessing ({uninformed_bpc:.2f})"
+    )
 
 
 def test_language_model_weights_change(tiny_corpus):
@@ -71,8 +71,14 @@ def test_trained_language_model_reloads_and_generates(tiny_corpus):
     path = tiny_corpus.checkpoint_dir / "best.pt"
 
     model, tokenizer, cfg, info = load_language_model(path, device="cpu")
-    text = generate_text(model, tokenizer, "the ", max_new_tokens=20,
-                         block_size=cfg.data.block_size, device=info["device"])
+    text = generate_text(
+        model,
+        tokenizer,
+        "the ",
+        max_new_tokens=20,
+        block_size=cfg.data.block_size,
+        device=info["device"],
+    )
     assert text.startswith("the ")
     assert len(text) > 4
 
@@ -82,7 +88,9 @@ def test_reloaded_weights_match(tiny_corpus):
 
     trainer = Trainer(tiny_corpus)
     trainer.fit()
-    model, _, _, _ = load_language_model(tiny_corpus.checkpoint_dir / "live.pt", device="cpu")
+    model, _, _, _ = load_language_model(
+        tiny_corpus.checkpoint_dir / "live.pt", device="cpu"
+    )
 
     for key, tensor in trainer.model.state_dict().items():
         assert torch.allclose(model.state_dict()[key], tensor)
@@ -110,6 +118,6 @@ def test_scheduler_changes_the_learning_rate(tiny_corpus):
     trainer.fit()
 
     rates = [record["lr"] for record in trainer.history]
-    assert any(r != tiny_corpus.training.learning_rate for r in rates), \
+    assert any(r != tiny_corpus.training.learning_rate for r in rates), (
         "the learning rate never moved despite a cosine schedule"
-
+    )

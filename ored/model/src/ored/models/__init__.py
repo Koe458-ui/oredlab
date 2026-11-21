@@ -8,12 +8,12 @@ from ored.models.transformer import (
 )
 
 __all__ = [
+    "MODEL_REGISTRY",
+    "CausalSelfAttention",
+    "FeedForward",
     "OredModel",
     "Transformer",
     "TransformerBlock",
-    "CausalSelfAttention",
-    "FeedForward",
-    "MODEL_REGISTRY",
     "build_model",
     "register_model",
 ]

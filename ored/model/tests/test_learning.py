@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from ored.learning import (
     CandidateStatus,
     Conversation,
@@ -33,10 +32,22 @@ def conversation_with(store, turns):
     for index, (prompt, response) in enumerate(turns):
         stamp = f"2026-01-01T00:00:{index * 2:02d}Z"
         next_stamp = f"2026-01-01T00:00:{index * 2 + 1:02d}Z"
-        messages.append(Message(conversation_id=conversation.id, role=Role.USER,
-                                content=prompt, created_at=stamp))
-        messages.append(Message(conversation_id=conversation.id, role=Role.ASSISTANT,
-                                content=response, created_at=next_stamp))
+        messages.append(
+            Message(
+                conversation_id=conversation.id,
+                role=Role.USER,
+                content=prompt,
+                created_at=stamp,
+            )
+        )
+        messages.append(
+            Message(
+                conversation_id=conversation.id,
+                role=Role.ASSISTANT,
+                content=response,
+                created_at=next_stamp,
+            )
+        )
     store.add_messages(messages)
     return conversation
 
@@ -54,12 +65,22 @@ def test_a_visitor_without_an_account_is_stored_as_anonymous():
 def test_anonymous_conversations_are_learned_from(store):
     conversation = Conversation()
     store.add_conversation(conversation)
-    store.add_messages([
-        Message(conversation_id=conversation.id, role=Role.USER,
-                content="a question here", created_at="2026-01-01T00:00:00Z"),
-        Message(conversation_id=conversation.id, role=Role.ASSISTANT,
-                content="an answer here", created_at="2026-01-01T00:00:01Z"),
-    ])
+    store.add_messages(
+        [
+            Message(
+                conversation_id=conversation.id,
+                role=Role.USER,
+                content="a question here",
+                created_at="2026-01-01T00:00:00Z",
+            ),
+            Message(
+                conversation_id=conversation.id,
+                role=Role.ASSISTANT,
+                content="an answer here",
+                created_at="2026-01-01T00:00:01Z",
+            ),
+        ]
+    )
     candidates = build_candidates(conversation.id, store.messages_for(conversation.id))
     assert conversation.visitor == "anonymous"
     assert len(candidates) == 1
@@ -97,15 +118,19 @@ def test_contact_details_are_removed():
 
 def test_redaction_is_recorded_on_the_candidate(store):
     conversation = conversation_with(
-        store, [("reach me at name.surname@example.com", "a long enough answer here")])
-    candidate = build_candidates(conversation.id, store.messages_for(conversation.id))[0]
+        store, [("reach me at name.surname@example.com", "a long enough answer here")]
+    )
+    candidate = build_candidates(conversation.id, store.messages_for(conversation.id))[
+        0
+    ]
     assert candidate.redacted
 
 
 def test_approval_needs_a_reviewer(store):
     conversation = conversation_with(store, [("a question here", "an answer here")])
     candidate = store.add_candidates(
-        build_candidates(conversation.id, store.messages_for(conversation.id)))[0]
+        build_candidates(conversation.id, store.messages_for(conversation.id))
+    )[0]
     with pytest.raises(ReviewError):
         approve(store, candidate, reviewer="", dataset_tag="v1")
 
@@ -113,7 +138,8 @@ def test_approval_needs_a_reviewer(store):
 def test_approval_files_an_example(store):
     conversation = conversation_with(store, [("a question here", "an answer here")])
     candidate = store.add_candidates(
-        build_candidates(conversation.id, store.messages_for(conversation.id)))[0]
+        build_candidates(conversation.id, store.messages_for(conversation.id))
+    )[0]
     example = approve(store, candidate, reviewer="admin", dataset_tag="v1")
     assert candidate.status is CandidateStatus.APPROVED
     assert store.examples("v1") == [example]
@@ -122,7 +148,8 @@ def test_approval_files_an_example(store):
 def test_a_rejected_candidate_cannot_be_approved(store):
     conversation = conversation_with(store, [("a question here", "an answer here")])
     candidate = store.add_candidates(
-        build_candidates(conversation.id, store.messages_for(conversation.id)))[0]
+        build_candidates(conversation.id, store.messages_for(conversation.id))
+    )[0]
     reject(store, candidate, reviewer="admin")
     with pytest.raises(ReviewError):
         approve(store, candidate, reviewer="admin", dataset_tag="v1")
@@ -131,7 +158,8 @@ def test_a_rejected_candidate_cannot_be_approved(store):
 def test_a_thin_dataset_is_refused(store):
     conversation = conversation_with(store, [("a question here", "an answer here")])
     candidate = store.add_candidates(
-        build_candidates(conversation.id, store.messages_for(conversation.id)))[0]
+        build_candidates(conversation.id, store.messages_for(conversation.id))
+    )[0]
     approve(store, candidate, reviewer="admin", dataset_tag="v1")
     with pytest.raises(ds.DatasetError):
         ds.export(store, ds.DatasetSpec(tag="v1"))
@@ -140,9 +168,11 @@ def test_a_thin_dataset_is_refused(store):
 def test_dataset_export_writes_a_split(store, tmp_path):
     for index in range(20):
         conversation = conversation_with(
-            store, [(f"question number {index} here", f"answer number {index} here")])
+            store, [(f"question number {index} here", f"answer number {index} here")]
+        )
         candidate = store.add_candidates(
-            build_candidates(conversation.id, store.messages_for(conversation.id)))[0]
+            build_candidates(conversation.id, store.messages_for(conversation.id))
+        )[0]
         approve(store, candidate, reviewer="admin", dataset_tag="v1")
 
     spec = ds.DatasetSpec(tag="v1", min_examples=10, min_conversations=10)
@@ -172,7 +202,9 @@ def test_a_failed_session_cannot_be_evaluated(store):
 
 
 def evaluated(store, examples=300, conversations=80, val_loss=0.4):
-    session = sess.queue(store, "v1", {}, example_count=examples, conversation_count=conversations)
+    session = sess.queue(
+        store, "v1", {}, example_count=examples, conversation_count=conversations
+    )
     sess.start(store, session)
     sess.finish(store, session, {"val_loss": val_loss})
     return session
@@ -242,27 +274,31 @@ def test_session_states_are_recorded(store):
 def test_dataset_specs_are_read_from_the_store(store):
     from ored.learning import Dataset
 
-    store.add_dataset(Dataset(
-        name='arithmetic',
-        kind='tabular',
-        generator='scripts/generate_corpus.py',
-        spec={'rows': 256},
-        samples=[{'split': 'train'}],
-    ))
-    store.add_dataset(Dataset(name='char_corpus', kind='text'))
+    store.add_dataset(
+        Dataset(
+            name="arithmetic",
+            kind="tabular",
+            generator="scripts/generate_corpus.py",
+            spec={"rows": 256},
+            samples=[{"split": "train"}],
+        )
+    )
+    store.add_dataset(Dataset(name="char_corpus", kind="text"))
 
-    assert [d.name for d in store.datasets()] == ['arithmetic', 'char_corpus']
+    assert [d.name for d in store.datasets()] == ["arithmetic", "char_corpus"]
 
-    only = store.datasets('char_corpus')
-    assert len(only) == 1 and only[0].kind == 'text'
+    only = store.datasets("char_corpus")
+    assert len(only) == 1 and only[0].kind == "text"
 
-    assert store.datasets('nothing_here') == []
+    assert store.datasets("nothing_here") == []
 
 
 def test_a_dataset_carries_its_spec_not_a_file_path_alone(store):
     from ored.learning import Dataset
 
-    store.add_dataset(Dataset(name='arithmetic', spec={'rows': 256}, samples=[{'a': 0}]))
-    found = store.datasets('arithmetic')[0]
-    assert found.spec['rows'] == 256
+    store.add_dataset(
+        Dataset(name="arithmetic", spec={"rows": 256}, samples=[{"a": 0}])
+    )
+    found = store.datasets("arithmetic")[0]
+    assert found.spec["rows"] == 256
     assert found.samples

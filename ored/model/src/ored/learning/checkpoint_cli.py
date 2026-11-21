@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any
 
 from ored.learning.checkpoints import (
     CheckpointStore,
@@ -23,7 +23,13 @@ from ored.learning.checkpoints import (
 from ored.learning.records import Checkpoint, CheckpointKind, CheckpointPart
 from ored.learning.store import StoreError
 from ored.learning.supabase_store import SupabaseStore
-from ored.utils.checkpoint import CheckpointError, PromotionRule, as_kind, load_checkpoint, write_payload
+from ored.utils.checkpoint import (
+    CheckpointError,
+    PromotionRule,
+    as_kind,
+    load_checkpoint,
+    write_payload,
+)
 from ored.utils.logging_utils import get_logger, section
 
 logger = get_logger(__name__)
@@ -54,11 +60,11 @@ only: the service key must never reach a browser or phone app).
 """
 
 
-def _metric(record_metrics: dict, name: str) -> Optional[float]:
+def _metric(record_metrics: dict, name: str) -> float | None:
     return PromotionRule(metric=name).value(record_metrics)
 
 
-def _num(value: Optional[float], digits: int = 5) -> str:
+def _num(value: float | None, digits: int = 5) -> str:
     return "-" if value is None else f"{value:.{digits}f}"
 
 
@@ -104,8 +110,14 @@ def card(record: Checkpoint, report: Any = None) -> str:
         f"PyTorch:         {record.torch_version or '-'}",
         f"Storage path:    {record.bucket_id}/{record.object_path}",
         f"Derived from:    {record.parent_checkpoint_id or '-'}",
-        *([f"Distributed:     {record.world_size} workers, group {record.checkpoint_group_id} "
-           f"({'complete' if record.is_complete else 'INCOMPLETE'})"] if record.part is not CheckpointPart.FILE else []),
+        *(
+            [
+                f"Distributed:     {record.world_size} workers, group {record.checkpoint_group_id} "
+                f"({'complete' if record.is_complete else 'INCOMPLETE'})"
+            ]
+            if record.part is not CheckpointPart.FILE
+            else []
+        ),
         f"Created:         {record.created_at}",
         f"Uploaded by:     {record.uploaded_by or '-'}",
         f"Verified:        {_verified(record, report)}",
@@ -114,7 +126,7 @@ def card(record: Checkpoint, report: Any = None) -> str:
     return "\n".join(lines)
 
 
-def table(records: List[Checkpoint]) -> str:
+def table(records: list[Checkpoint]) -> str:
     header = f"{'role':<8} {'cur':<3} {'run':<22} {'epoch':>5} {'step':>10} {'val_loss':>9} {'size':>9}  {'created':<25} id"
     rows = [header, "-" * len(header)]
     for r in records:
@@ -130,33 +142,37 @@ def local_card(path: Path) -> str:
     payload = load_checkpoint(path)
     m = payload.get("metrics") or {}
     promotion = payload.get("promotion") or {}
-    resumable = bool(payload.get("optimizer_state_dict") and payload.get("trainer_state"))
-    return "\n".join([
-        "Ored Checkpoint (local file)",
-        "",
-        f"Role:            {(payload.get('checkpoint_kind') or 'unknown (format 1)').upper()}",
-        f"Run:             {payload.get('run_name') or '-'}",
-        f"Task:            {payload.get('task') or '-'}",
-        f"Architecture:    {payload.get('architecture') or '-'}",
-        f"Epoch:           {payload.get('epoch')}",
-        f"Global step:     {int(payload.get('global_step') or 0):,}",
-        "",
-        f"Validation loss: {_num(_metric(m, 'val_loss'))}",
-        f"BPC:             {_num(_metric(m, 'val_bpc'))}",
-        f"PPL:             {_num(_metric(m, 'val_ppl'))}",
-        f"Train loss:      {_num(_metric(m, 'train_loss'))}",
-        f"Best so far:     {promotion.get('metric', '-')} {_num(promotion.get('value'))} "
-        f"(epoch {promotion.get('epoch', '-')})",
-        f"Resumable:       {'YES' if resumable else 'NO'}",
-        "",
-        f"Size:            {_mb(path.stat().st_size)}",
-        f"SHA-256:         {digest(path)}",
-        f"Format:          {payload.get('format_version')}",
-        f"PyTorch:         {payload.get('torch_version') or '-'}",
-        f"Created:         {payload.get('created_at') or '-'}",
-        f"Path:            {path}",
-        "Loads:           YES",
-    ])
+    resumable = bool(
+        payload.get("optimizer_state_dict") and payload.get("trainer_state")
+    )
+    return "\n".join(
+        [
+            "Ored Checkpoint (local file)",
+            "",
+            f"Role:            {(payload.get('checkpoint_kind') or 'unknown (format 1)').upper()}",
+            f"Run:             {payload.get('run_name') or '-'}",
+            f"Task:            {payload.get('task') or '-'}",
+            f"Architecture:    {payload.get('architecture') or '-'}",
+            f"Epoch:           {payload.get('epoch')}",
+            f"Global step:     {int(payload.get('global_step') or 0):,}",
+            "",
+            f"Validation loss: {_num(_metric(m, 'val_loss'))}",
+            f"BPC:             {_num(_metric(m, 'val_bpc'))}",
+            f"PPL:             {_num(_metric(m, 'val_ppl'))}",
+            f"Train loss:      {_num(_metric(m, 'train_loss'))}",
+            f"Best so far:     {promotion.get('metric', '-')} {_num(promotion.get('value'))} "
+            f"(epoch {promotion.get('epoch', '-')})",
+            f"Resumable:       {'YES' if resumable else 'NO'}",
+            "",
+            f"Size:            {_mb(path.stat().st_size)}",
+            f"SHA-256:         {digest(path)}",
+            f"Format:          {payload.get('format_version')}",
+            f"PyTorch:         {payload.get('torch_version') or '-'}",
+            f"Created:         {payload.get('created_at') or '-'}",
+            f"Path:            {path}",
+            "Loads:           YES",
+        ]
+    )
 
 
 def _connect():
@@ -171,7 +187,9 @@ def _resolve(store: Any, ref: str, run: str) -> Checkpoint:
     if ref in KINDS:
         record = find(store, CheckpointKind(ref), run)
         if record is None:
-            raise StoreError(f"no {ref} checkpoint{' for run ' + run if run else ''} is stored")
+            raise StoreError(
+                f"no {ref} checkpoint{' for run ' + run if run else ''} is stored"
+            )
         return record
     record = store.checkpoint(ref)
     if record is None:
@@ -180,7 +198,11 @@ def _resolve(store: Any, ref: str, run: str) -> Checkpoint:
 
 
 def _show_role(store: Any, kind: CheckpointKind, run: str) -> int:
-    runs = [run] if run else sorted({r.run_name for r in store.checkpoints(kind, logical=True)})
+    runs = (
+        [run]
+        if run
+        else sorted({r.run_name for r in store.checkpoints(kind, logical=True)})
+    )
     shown = 0
     for name in runs:
         record = find(store, kind, name)
@@ -191,7 +213,9 @@ def _show_role(store: Any, kind: CheckpointKind, run: str) -> int:
         print(card(record))
         shown += 1
     if not shown:
-        print(f"No {kind.value} checkpoint{' for run ' + run if run else ''} is stored.")
+        print(
+            f"No {kind.value} checkpoint{' for run ' + run if run else ''} is stored."
+        )
         if kind is CheckpointKind.LIVE:
             print("There is nothing to resume from: start a fresh run.")
         return 1
@@ -233,14 +257,18 @@ def cmd_history(args: argparse.Namespace) -> int:
         key=lambda r: (r.global_step, r.epoch),
     )
     if not records:
-        print(f"Run {args.run} has no history snapshots. Turn on checkpoint.keep_history to keep them.")
+        print(
+            f"Run {args.run} has no history snapshots. Turn on checkpoint.keep_history to keep them."
+        )
         return 0
     print(f"History of {args.run}: {len(records)} snapshots\n")
     print(table(records))
     return 0
 
 
-def _verify_group(args: argparse.Namespace, store: Any = None, files: Any = None) -> int:
+def _verify_group(
+    args: argparse.Namespace, store: Any = None, files: Any = None
+) -> int:
     from ored.config import load_config
     from ored.distributed.checkpoint import verify_group_dir, verify_group_remote
     from ored.distributed.cli import report
@@ -279,10 +307,16 @@ def cmd_promote_best(args: argparse.Namespace) -> int:
     store, files = _connect()
     path = Path(args.checkpoint)
     if path.exists():
-        record, message = promote_best(store, files, path, args.run, _rule(args), force=args.force)
+        record, message = promote_best(
+            store, files, path, args.run, _rule(args), force=args.force
+        )
     else:
         record, message = promote_existing_best(
-            store, files, _resolve(store, args.checkpoint, args.run).id, _rule(args), force=args.force
+            store,
+            files,
+            _resolve(store, args.checkpoint, args.run).id,
+            _rule(args),
+            force=args.force,
         )
     print(message)
     if record is not None:
@@ -304,10 +338,16 @@ def _place(args: argparse.Namespace, source: str, kind: str) -> int:
     from ored.config import load_config
     from ored.training.checkpoints import CheckpointManager, place_checkpoint
 
-    overrides = list(args.overrides) + (["checkpoint.upload=true"] if args.upload else [])
+    overrides = list(args.overrides) + (
+        ["checkpoint.upload=true"] if args.upload else []
+    )
     cfg = load_config(args.config, overrides)
     path, message = place_checkpoint(
-        cfg, source, kind, force=getattr(args, "force", False), device=args.device,
+        cfg,
+        source,
+        kind,
+        force=getattr(args, "force", False),
+        device=args.device,
         manager=CheckpointManager.for_training(cfg),
     )
     print(message)
@@ -335,7 +375,9 @@ def cmd_export(args: argparse.Namespace) -> int:
     if not args.run:
         raise StoreError("export needs --run (Supabase) or --path (a local checkpoint)")
     store, files = _connect()
-    record = export_checkpoint(store, files, args.run, CheckpointKind(args.source), local_copy=args.out)
+    record = export_checkpoint(
+        store, files, args.run, CheckpointKind(args.source), local_copy=args.out
+    )
     print(card(record))
     return 0
 
@@ -349,18 +391,24 @@ def cmd_duplicates(args: argparse.Namespace) -> int:
     for group in groups:
         c = group.canonical
         print(f"sha256 {group.sha256}")
-        print(f"  keep   {c.id}  {c.kind.value:<7} {c.run_name:<20} {c.object_path}"
-              f"{'  (current)' if c.is_current else ''}")
+        print(
+            f"  keep   {c.id}  {c.kind.value:<7} {c.run_name:<20} {c.object_path}"
+            f"{'  (current)' if c.is_current else ''}"
+        )
         for extra in group.extras:
             note = "  (current: kept)" if extra.is_current else ""
-            print(f"  extra  {extra.id}  {extra.kind.value:<7} {extra.run_name:<20} {extra.object_path}{note}")
+            print(
+                f"  extra  {extra.id}  {extra.kind.value:<7} {extra.run_name:<20} {extra.object_path}{note}"
+            )
         print(f"  reclaimable: {_mb(group.reclaimable_bytes)}")
     doomed = remove_duplicates(store, files, apply=args.apply)
     print()
     if args.apply:
         print(f"Removed {len(doomed)} duplicate rows and their objects.")
     else:
-        print(f"{len(doomed)} rows would be removed. Nothing was changed: re-run with --apply.")
+        print(
+            f"{len(doomed)} rows would be removed. Nothing was changed: re-run with --apply."
+        )
     return 0
 
 
@@ -419,11 +467,15 @@ def cmd_push(args: argparse.Namespace) -> int:
 
 def cmd_pull(args: argparse.Namespace) -> int:
     store, files = _connect()
-    record = fetch(store, files, args.path, kind=CheckpointKind(args.kind), run_name=args.run_name)
+    record = fetch(
+        store, files, args.path, kind=CheckpointKind(args.kind), run_name=args.run_name
+    )
     if record is None:
         logger.error(f"no {args.kind} checkpoint is stored")
         return 1
-    print(f"pulled {record.bucket_id}/{record.object_path} -> {args.path} (sha256 verified)")
+    print(
+        f"pulled {record.bucket_id}/{record.object_path} -> {args.path} (sha256 verified)"
+    )
     return 0
 
 
@@ -444,20 +496,26 @@ def cmd_migrate_to_r2(args: argparse.Namespace) -> int:
     ]
     failed = 0
     for bucket, sums in buckets:
-        source = CheckpointStore(url, key, bucket, max_object_bytes=max_object_bytes_from_env())
+        source = CheckpointStore(
+            url, key, bucket, max_object_bytes=max_object_bytes_from_env()
+        )
         target = R2Store.from_env(bucket)
         report = copy_bucket(source, target, dry_run=args.dry_run, expected=sums)
         verb = "would copy" if args.dry_run else "copied"
-        print(f"{bucket}: {verb} {len(report['copied'])}, already in R2 {len(report['skipped'])}, "
-              f"failed {len(report['failed'])}")
+        print(
+            f"{bucket}: {verb} {len(report['copied'])}, already in R2 {len(report['skipped'])}, "
+            f"failed {len(report['failed'])}"
+        )
         for path in report["copied"]:
             print(f"  {verb}  {path}")
         for problem in report["failed"]:
             print(f"  FAILED  {problem}")
         failed += len(report["failed"])
     if not failed and not args.dry_run:
-        print("Every object is in R2. Set ORED_R2_* on every machine to switch over; "
-              "Supabase Storage is left untouched.")
+        print(
+            "Every object is in R2. Set ORED_R2_* on every machine to switch over; "
+            "Supabase Storage is left untouched."
+        )
     return 1 if failed else 0
 
 
@@ -471,10 +529,18 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     def with_rule(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--metric", default="val_loss", help="promotion metric (default val_loss)")
-        p.add_argument("--mode", default="min", choices=["min", "max"],
-                       help="min = lower is better (default)")
-        p.add_argument("--force", action="store_true", help="promote even if not better")
+        p.add_argument(
+            "--metric", default="val_loss", help="promotion metric (default val_loss)"
+        )
+        p.add_argument(
+            "--mode",
+            default="min",
+            choices=["min", "max"],
+            help="min = lower is better (default)",
+        )
+        p.add_argument(
+            "--force", action="store_true", help="promote even if not better"
+        )
 
     p = sub.add_parser("list")
     p.add_argument("--run", default="")
@@ -482,7 +548,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--current", action="store_true", help="only the current rows")
     p.set_defaults(func=cmd_list)
 
-    for name, kind in (("show-live", CheckpointKind.LIVE), ("show-best", CheckpointKind.BEST)):
+    for name, kind in (
+        ("show-live", CheckpointKind.LIVE),
+        ("show-best", CheckpointKind.BEST),
+    ):
         p = sub.add_parser(name)
         p.add_argument("--run", default="")
         p.set_defaults(func=lambda a, k=kind: _show_role(_connect()[0], k, a.run))
@@ -498,9 +567,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_history)
 
     p = sub.add_parser("verify")
-    p.add_argument("checkpoint", help="id, checkpoint_group_id, role (live/best/...), .pt file or checkpoint folder")
+    p.add_argument(
+        "checkpoint",
+        help="id, checkpoint_group_id, role (live/best/...), .pt file or checkpoint folder",
+    )
     p.add_argument("--run", default="")
-    p.add_argument("--config", default="", help="also check the model config is compatible")
+    p.add_argument(
+        "--config", default="", help="also check the model config is compatible"
+    )
     p.set_defaults(func=cmd_verify)
 
     p = sub.add_parser("promote-best")
@@ -511,23 +585,40 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("resume-live")
     p.add_argument("--config", required=True)
-    p.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
+    p.add_argument(
+        "--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE"
+    )
     p.set_defaults(func=cmd_resume_live)
 
     def with_run_config(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--config", required=True, help="the run's config; its run_name picks checkpoints/<run_name>/")
-        p.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
+        p.add_argument(
+            "--config",
+            required=True,
+            help="the run's config; its run_name picks checkpoints/<run_name>/",
+        )
+        p.add_argument(
+            "--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE"
+        )
         p.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
         p.add_argument("--upload", action="store_true", help="also publish to Supabase")
 
-    p = sub.add_parser("save", help="put a checkpoint file into this run's live, best or history")
+    p = sub.add_parser(
+        "save", help="put a checkpoint file into this run's live, best or history"
+    )
     p.add_argument("path")
-    p.add_argument("--as", dest="role", required=True, choices=["live", "best", "history"])
-    p.add_argument("--force", action="store_true", help="for best: replace even if not better")
+    p.add_argument(
+        "--as", dest="role", required=True, choices=["live", "best", "history"]
+    )
+    p.add_argument(
+        "--force", action="store_true", help="for best: replace even if not better"
+    )
     with_run_config(p)
     p.set_defaults(func=cmd_save)
 
-    p = sub.add_parser("merge-live", help="make the online session's live.pt the best if it validates better")
+    p = sub.add_parser(
+        "merge-live",
+        help="make the online session's live.pt the best if it validates better",
+    )
     p.add_argument("--live", default="checkpoints/live/live.pt")
     p.add_argument("--force", action="store_true")
     with_run_config(p)
@@ -576,15 +667,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--run-name", default="")
     p.set_defaults(func=cmd_pull)
 
-    p = sub.add_parser("migrate-to-r2",
-                       help="copy every checkpoint and dataset file from Supabase Storage to R2, same names")
+    p = sub.add_parser(
+        "migrate-to-r2",
+        help="copy every checkpoint and dataset file from Supabase Storage to R2, same names",
+    )
     p.add_argument("--dry-run", action="store_true", help="list what would be copied")
     p.set_defaults(func=cmd_migrate_to_r2)
 
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     logger.info(section("ORED AI -- CHECKPOINTS"))
     try:

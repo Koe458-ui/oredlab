@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ored.learning.records import SessionStatus, TrainingSession, now
 from ored.learning.store import LearningStore
@@ -12,7 +12,11 @@ class SessionError(RuntimeError):
 
 ALLOWED_TRANSITIONS = {
     SessionStatus.QUEUED: {SessionStatus.RUNNING, SessionStatus.CANCELLED},
-    SessionStatus.RUNNING: {SessionStatus.EVALUATED, SessionStatus.FAILED, SessionStatus.CANCELLED},
+    SessionStatus.RUNNING: {
+        SessionStatus.EVALUATED,
+        SessionStatus.FAILED,
+        SessionStatus.CANCELLED,
+    },
     SessionStatus.EVALUATED: set(),
     SessionStatus.FAILED: set(),
     SessionStatus.CANCELLED: set(),
@@ -22,12 +26,12 @@ ALLOWED_TRANSITIONS = {
 def queue(
     store: LearningStore,
     dataset_tag: str,
-    config: Dict[str, Any],
+    config: dict[str, Any],
     example_count: int,
     conversation_count: int,
-    base_version: Optional[str] = None,
+    base_version: str | None = None,
     run_name: str = "",
-    dataset_id: Optional[str] = None,
+    dataset_id: str | None = None,
 ) -> TrainingSession:
     if not dataset_tag:
         raise SessionError("a training session must name the dataset it runs on")
@@ -47,7 +51,9 @@ def queue(
 
 def _move(session: TrainingSession, status: SessionStatus) -> None:
     if status not in ALLOWED_TRANSITIONS[session.status]:
-        raise SessionError(f"cannot move a session from {session.status.value} to {status.value}")
+        raise SessionError(
+            f"cannot move a session from {session.status.value} to {status.value}"
+        )
     session.status = status
 
 
@@ -60,7 +66,7 @@ def start(store: LearningStore, session: TrainingSession) -> TrainingSession:
 def finish(
     store: LearningStore,
     session: TrainingSession,
-    metrics: Dict[str, float],
+    metrics: dict[str, float],
 ) -> TrainingSession:
     if not metrics:
         raise SessionError("a session cannot be recorded as evaluated without metrics")
@@ -77,7 +83,9 @@ def fail(store: LearningStore, session: TrainingSession, error: str) -> Training
     return store.update_session(session)
 
 
-def cancel(store: LearningStore, session: TrainingSession, reason: str = "") -> TrainingSession:
+def cancel(
+    store: LearningStore, session: TrainingSession, reason: str = ""
+) -> TrainingSession:
     _move(session, SessionStatus.CANCELLED)
     session.error = reason[:500]
     session.finished_at = now()

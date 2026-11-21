@@ -4,9 +4,10 @@ import argparse
 import json
 import random
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Sequence
+
 
 import yaml
 
@@ -28,7 +29,6 @@ class FactsError(RuntimeError):
 
 @dataclass
 class Fact:
-
     answer: str
     subject: str = ""
     question: str = ""
@@ -54,11 +54,10 @@ class Fact:
 
 @dataclass
 class FactSpec:
+    questions: list[str]
+    facts: list[Fact]
 
-    questions: List[str]
-    facts: List[Fact]
-
-    def validate(self) -> "FactSpec":
+    def validate(self) -> FactSpec:
         if not self.facts:
             raise FactsError("a facts file needs at least one fact")
 
@@ -85,17 +84,22 @@ class FactSpec:
         return self
 
     @property
-    def subjects(self) -> List[str]:
+    def subjects(self) -> list[str]:
         return [fact.label for fact in self.facts]
 
     @property
-    def categories(self) -> Dict[str, int]:
+    def categories(self) -> dict[str, int]:
         return dict(Counter(fact.category for fact in self.facts if fact.category))
 
     @property
     def longest_line(self) -> int:
-        return max((len(fact.line(self.questions[0] if self.questions else ""))
-                    for fact in self.facts), default=0)
+        return max(
+            (
+                len(fact.line(self.questions[0] if self.questions else ""))
+                for fact in self.facts
+            ),
+            default=0,
+        )
 
 
 def load_facts(path: str | Path = DEFAULT_FACTS) -> FactSpec:
@@ -109,7 +113,7 @@ def load_facts(path: str | Path = DEFAULT_FACTS) -> FactSpec:
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     entries = raw.get("facts") or []
 
-    facts: List[Fact] = []
+    facts: list[Fact] = []
     for entry in entries:
         entry = entry or {}
         answer = str(entry.get("answer") or "").strip()
@@ -121,15 +125,16 @@ def load_facts(path: str | Path = DEFAULT_FACTS) -> FactSpec:
                 f"every fact needs an answer and either a question or a subject, "
                 f"got {entry!r}"
             )
-        facts.append(Fact(answer=answer, subject=subject, question=question,
-                          category=category))
+        facts.append(
+            Fact(answer=answer, subject=subject, question=question, category=category)
+        )
 
     questions = [str(q).strip() for q in (raw.get("questions") or []) if str(q).strip()]
     return FactSpec(questions=questions, facts=facts).validate()
 
 
-def fact_lines(spec: FactSpec, repeats: int, rng: random.Random) -> List[str]:
-    lines: List[str] = []
+def fact_lines(spec: FactSpec, repeats: int, rng: random.Random) -> list[str]:
+    lines: list[str] = []
     for fact in spec.facts:
         for _ in range(repeats):
             template = rng.choice(spec.questions) if spec.questions else ""
@@ -138,7 +143,7 @@ def fact_lines(spec: FactSpec, repeats: int, rng: random.Random) -> List[str]:
     return lines
 
 
-def repeats_by_split(repeats: int, val_test_fraction: float) -> Dict[str, int]:
+def repeats_by_split(repeats: int, val_test_fraction: float) -> dict[str, int]:
     smaller = max(1, int(round(repeats * val_test_fraction)))
     return {"train": repeats, "val": smaller, "test": smaller}
 
@@ -148,13 +153,15 @@ def generate_fact_corpus(
     spec: FactSpec,
     repeats: int = 60,
     force: bool = True,
-) -> Dict[str, CorpusStats]:
+) -> dict[str, CorpusStats]:
     if repeats < 1:
         raise FactsError("repeats must be >= 1")
 
     counts = repeats_by_split(repeats, cfg.data.corpus.val_test_fraction)
-    extra_lines: Dict[str, Sequence[str]] = {
-        split: fact_lines(spec, counts[split], random.Random(cfg.seed + SPLITS.index(split)))
+    extra_lines: dict[str, Sequence[str]] = {
+        split: fact_lines(
+            spec, counts[split], random.Random(cfg.seed + SPLITS.index(split))
+        )
         for split in SPLITS
     }
 
@@ -184,13 +191,15 @@ def generate_fact_corpus(
     return stats
 
 
-def load_fact_subjects(directory: str | Path) -> List[str]:
+def load_fact_subjects(directory: str | Path) -> list[str]:
     path = Path(directory) / "facts.json"
     if not path.exists():
         return []
     raw = json.loads(path.read_text(encoding="utf-8"))
-    return [str(fact.get("subject") or fact.get("question") or "")
-            for fact in raw.get("facts", [])]
+    return [
+        str(fact.get("subject") or fact.get("question") or "")
+        for fact in raw.get("facts", [])
+    ]
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -201,10 +210,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--config", required=True)
     parser.add_argument("--facts", default=DEFAULT_FACTS)
-    parser.add_argument("--repeats", type=int, default=60,
-                        help="how many times each fact appears in the training corpus")
-    parser.add_argument("--set", dest="overrides", action="append", default=[],
-                        metavar="KEY=VALUE")
+    parser.add_argument(
+        "--repeats",
+        type=int,
+        default=60,
+        help="how many times each fact appears in the training corpus",
+    )
+    parser.add_argument(
+        "--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE"
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -223,8 +237,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if spec.categories:
         listed = sorted(spec.categories.items())
         logger.info("categories : " + ", ".join(f"{name} {n}" for name, n in listed))
-    logger.info(f"longest    : {spec.longest_line} characters "
-                f"(raise data.block_size above this or it is cut short)")
+    logger.info(
+        f"longest    : {spec.longest_line} characters "
+        f"(raise data.block_size above this or it is cut short)"
+    )
     for subject in spec.subjects[:SUBJECTS_LISTED]:
         logger.info(f"  {subject}")
     if len(spec.facts) > SUBJECTS_LISTED:

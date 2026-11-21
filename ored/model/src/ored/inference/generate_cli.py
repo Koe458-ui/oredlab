@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import List, Optional
+
 
 from ored.data.corpus import format_answer, load_arithmetic_pairs
 from ored.evaluation.lm_evaluator import load_language_model
@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 DEFAULT_CHECKPOINT = "checkpoints/ored50m/best.pt"
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Generate text with a trained Ored AI language model.",
         epilog=(
@@ -30,24 +30,49 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--checkpoint", default=DEFAULT_CHECKPOINT)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--prompt", default=None, help="text to continue")
-    parser.add_argument("--tokens", type=int, default=None,
-                        help="how many characters to generate")
-    parser.add_argument("--temperature", type=float, default=None,
-                        help="<1 safer and more repetitive, >1 more varied")
-    parser.add_argument("--top-k", type=int, default=None,
-                        help="sample only from the k most likely characters")
-    parser.add_argument("--top-p", type=float, default=None,
-                        help="nucleus sampling threshold, e.g. 0.9")
-    parser.add_argument("--greedy", action="store_true",
-                        help="always take the most likely character (deterministic)")
-    parser.add_argument("--seed", type=int, default=None,
-                        help="fix the sampling seed to reproduce a sample")
-    parser.add_argument("--complete", default=None, metavar="TEXT",
-                        help="greedily finish one line, e.g. \"17 + 9 = \"")
-    parser.add_argument("--arithmetic", action="store_true",
-                        help="ask it to add pairs held out of the training corpus")
-    parser.add_argument("--n", type=int, default=12,
-                        help="--arithmetic: how many held-out pairs to try")
+    parser.add_argument(
+        "--tokens", type=int, default=None, help="how many characters to generate"
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=None,
+        help="<1 safer and more repetitive, >1 more varied",
+    )
+    parser.add_argument(
+        "--top-k",
+        type=int,
+        default=None,
+        help="sample only from the k most likely characters",
+    )
+    parser.add_argument(
+        "--top-p", type=float, default=None, help="nucleus sampling threshold, e.g. 0.9"
+    )
+    parser.add_argument(
+        "--greedy",
+        action="store_true",
+        help="always take the most likely character (deterministic)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="fix the sampling seed to reproduce a sample",
+    )
+    parser.add_argument(
+        "--complete",
+        default=None,
+        metavar="TEXT",
+        help='greedily finish one line, e.g. "17 + 9 = "',
+    )
+    parser.add_argument(
+        "--arithmetic",
+        action="store_true",
+        help="ask it to add pairs held out of the training corpus",
+    )
+    parser.add_argument(
+        "--n", type=int, default=12, help="--arithmetic: how many held-out pairs to try"
+    )
     parser.add_argument("--quiet", action="store_true", help="output only")
     args = parser.parse_args(argv)
 
@@ -67,12 +92,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not args.quiet:
         logger.info(section("ORED AI -- TEXT GENERATION"))
         logger.info(f"checkpoint : {args.checkpoint}")
-        logger.info(f"trained to : epoch {info.get('epoch')} (saved {info.get('saved_at')})")
+        logger.info(
+            f"trained to : epoch {info.get('epoch')} (saved {info.get('saved_at')})"
+        )
         metrics = info.get("metrics") or {}
         if metrics:
-            logger.info("val        : " + "  ".join(f"{k}={v:.4f}" for k, v in metrics.items()))
-        logger.info(f"sampling   : temperature {temperature}, top_k {top_k}, top_p {top_p}"
-                    f"{', greedy' if args.greedy else ''}")
+            logger.info(
+                "val        : " + "  ".join(f"{k}={v:.4f}" for k, v in metrics.items())
+            )
+        logger.info(
+            f"sampling   : temperature {temperature}, top_k {top_k}, top_p {top_p}"
+            f"{', greedy' if args.greedy else ''}"
+        )
         logger.info("")
 
     if args.complete is not None:
@@ -82,7 +113,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.arithmetic:
         reverse_answer = cfg.data.corpus.reverse_answer
-        pairs = load_arithmetic_pairs(cfg.data.corpus.dir)["test"][:args.n]
+        pairs = load_arithmetic_pairs(cfg.data.corpus.dir)["test"][: args.n]
         if not args.quiet:
             logger.info("These operand pairs were held out of the training corpus, so")
             logger.info("the model has never read the line it is completing.")
@@ -91,21 +122,33 @@ def main(argv: Optional[List[str]] = None) -> int:
             logger.info("")
         correct = 0
         for a, b in pairs:
-            written = complete(model, tokenizer, f"{a} + {b} = ",
-                               cfg.data.block_size, device)
+            written = complete(
+                model, tokenizer, f"{a} + {b} = ", cfg.data.block_size, device
+            )
             expected = format_answer(a + b, reverse_answer)
             ok = written.strip() == expected
             correct += ok
             mark = "OK   " if ok else "WRONG"
-            logger.info(f"  {a:>3} + {b:<3} = {written:<6} [{mark}] expected {expected}")
+            logger.info(
+                f"  {a:>3} + {b:<3} = {written:<6} [{mark}] expected {expected}"
+            )
         logger.info("")
-        logger.info(f"  {correct}/{len(pairs)} correct ({correct / max(1, len(pairs)):.0%})")
+        logger.info(
+            f"  {correct}/{len(pairs)} correct ({correct / max(1, len(pairs)):.0%})"
+        )
         return 0
 
     text = generate_text(
-        model=model, tokenizer=tokenizer, prompt=prompt,
-        max_new_tokens=tokens, block_size=cfg.data.block_size, device=device,
-        temperature=temperature, top_k=top_k, top_p=top_p, greedy=args.greedy,
+        model=model,
+        tokenizer=tokenizer,
+        prompt=prompt,
+        max_new_tokens=tokens,
+        block_size=cfg.data.block_size,
+        device=device,
+        temperature=temperature,
+        top_k=top_k,
+        top_p=top_p,
+        greedy=args.greedy,
     )
     logger.info(text)
     return 0

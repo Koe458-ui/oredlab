@@ -4,10 +4,10 @@ import argparse
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader
 
 from ored.config import Config, load_config
@@ -27,7 +27,9 @@ from ored.utils.weight_stats import (
 logger = get_logger(__name__)
 
 
-def build_optimizer(name: str, model: nn.Module, lr: float, weight_decay: float) -> torch.optim.Optimizer:
+def build_optimizer(
+    name: str, model: nn.Module, lr: float, weight_decay: float
+) -> torch.optim.Optimizer:
     optimizers = {
         "adam": torch.optim.Adam,
         "adamw": torch.optim.AdamW,
@@ -45,7 +47,7 @@ def _format_metric(name: str, value: float) -> str:
     return f"{value:.4f}"
 
 
-def _legend(metric_names: List[str]) -> str:
+def _legend(metric_names: list[str]) -> str:
     known = {
         "bpc": "bpc = bits per character of text (lower is better)",
         "ppl": "ppl = perplexity, how many tokens it is still choosing between",
@@ -54,17 +56,18 @@ def _legend(metric_names: List[str]) -> str:
     return "; ".join(parts) if parts else "loss only"
 
 
-def _describe_architecture(description: Dict[str, Any]) -> str:
+def _describe_architecture(description: dict[str, Any]) -> str:
     if description["type"] == "Transformer":
-        return (f"Transformer {description['n_layer']} layers x "
-                f"{description['n_head']} heads, d_model {description['d_model']}, "
-                f"d_ff {description['d_ff']}, block {description['block_size']}, "
-                f"vocab {description['vocab_size']}")
+        return (
+            f"Transformer {description['n_layer']} layers x "
+            f"{description['n_head']} heads, d_model {description['d_model']}, "
+            f"d_ff {description['d_ff']}, block {description['block_size']}, "
+            f"vocab {description['vocab_size']}"
+        )
     return str(description)
 
 
 class Trainer:
-
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
 
@@ -95,7 +98,7 @@ class Trainer:
         self.global_step = 0
         self.current_lr = cfg.training.learning_rate
 
-        self.history: List[Dict[str, float]] = []
+        self.history: list[dict[str, float]] = []
         self.best_val_loss = float("inf")
         self.epochs_without_improvement = 0
         self.checkpoint_dir = cfg.checkpoint_dir
@@ -107,9 +110,9 @@ class Trainer:
         self.epoch_complete = True
         self.epoch_generator_state = self.generator.get_state()
         self.train_metrics = MetricAccumulator()
-        self._resume_rng: Optional[Dict[str, Any]] = None
+        self._resume_rng: dict[str, Any] | None = None
 
-        self.dataset_link: Dict[str, Any] = {}
+        self.dataset_link: dict[str, Any] = {}
 
         self.resumed_from = ""
         self.resumed_live = False
@@ -139,15 +142,20 @@ class Trainer:
     def best_epoch(self) -> int:
         return self.checkpoints.best_epoch
 
-    def _tokenizer(self) -> Optional[Dict[str, Any]]:
+    def _tokenizer(self) -> dict[str, Any] | None:
         return self.task.checkpoint_extra().get("tokenizer")
 
-    def _payload_extra(self) -> Dict[str, Any]:
+    def _payload_extra(self) -> dict[str, Any]:
         dataset = self.task.checkpoint_extra().get("dataset")
         if not dataset:
             return {}
-        return {"dataset": {**dataset, **self.dataset_link,
-                            "session_id": getattr(self.checkpoints, "session_id", None)}}
+        return {
+            "dataset": {
+                **dataset,
+                **self.dataset_link,
+                "session_id": getattr(self.checkpoints, "session_id", None),
+            }
+        }
 
     def _warm_start(self, path: str) -> None:
         payload = load_checkpoint(path, map_location=self.device)
@@ -160,27 +168,44 @@ class Trainer:
     def _resume_live(self) -> None:
         payload = self.checkpoints.load_live_checkpoint(map_location=self.device)
         path = payload["_path"]
-        check_compatible(payload, self.model, path=path, expected_kind="live",
-                         tokenizer=self._tokenizer())
+        check_compatible(
+            payload,
+            self.model,
+            path=path,
+            expected_kind="live",
+            tokenizer=self._tokenizer(),
+        )
         load_model_state(self.model, payload["model_state_dict"], path)
         self.optimizer.load_state_dict(payload["optimizer_state_dict"])
         self._log_config_drift(payload.get("config") or {})
 
         self._restore_loop_state(payload, payload.get("rng_state"), path)
 
-    def _restore_loop_state(self, payload: Dict[str, Any], rng_state: Optional[Dict[str, Any]],
-                            path: str, train_sums: Optional[Dict[str, Any]] = None) -> None:
+    def _restore_loop_state(
+        self,
+        payload: dict[str, Any],
+        rng_state: dict[str, Any] | None,
+        path: str,
+        train_sums: dict[str, Any] | None = None,
+    ) -> None:
         state = payload["trainer_state"]
         self.global_step = int(payload["global_step"])
         self.epoch = int(payload["epoch"])
         self.history = [dict(r) for r in state.get("history", [])]
         best_val_loss = state.get("best_val_loss")
-        self.best_val_loss = float("inf") if best_val_loss is None else float(best_val_loss)
-        self.epochs_without_improvement = int(state.get("epochs_without_improvement", 0))
+        self.best_val_loss = (
+            float("inf") if best_val_loss is None else float(best_val_loss)
+        )
+        self.epochs_without_improvement = int(
+            state.get("epochs_without_improvement", 0)
+        )
         self.current_lr = float(state.get("current_lr", self.current_lr))
 
         promotion = payload.get("promotion") or {}
-        if promotion.get("metric") == self.checkpoints.rule.metric and promotion.get("mode") == self.checkpoints.rule.mode:
+        if (
+            promotion.get("metric") == self.checkpoints.rule.metric
+            and promotion.get("mode") == self.checkpoints.rule.mode
+        ):
             self.checkpoints.best_value = promotion.get("value")
             self.checkpoints.best_epoch = int(promotion.get("epoch") or 0)
         else:
@@ -200,31 +225,41 @@ class Trainer:
             if state.get("epoch_generator_state") is not None:
                 self.generator.set_state(state["epoch_generator_state"])
             self._resume_rng = rng_state
-            sums = train_sums if train_sums is not None else (state.get("train_sums") or {})
+            sums = (
+                train_sums
+                if train_sums is not None
+                else (state.get("train_sums") or {})
+            )
             self.train_metrics = MetricAccumulator(
                 int(sums.get("total_examples", 0)), dict(sums.get("sums", {}))
             )
         self.checkpoints.last_live_step = self.global_step
         self.resumed_live = True
-        where = (f"end of epoch {self.epoch}" if complete
-                 else f"epoch {self.epoch}, batch {self.batch_in_epoch}")
+        where = (
+            f"end of epoch {self.epoch}"
+            if complete
+            else f"epoch {self.epoch}, batch {self.batch_in_epoch}"
+        )
         self.resumed_from = f"{path} ({where}, step {self.global_step:,})"
 
-    def _log_config_drift(self, saved: Dict[str, Any]) -> None:
-        def flat(d: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
-            out: Dict[str, Any] = {}
+    def _log_config_drift(self, saved: dict[str, Any]) -> None:
+        def flat(d: dict[str, Any], prefix: str = "") -> dict[str, Any]:
+            out: dict[str, Any] = {}
             for k, v in d.items():
                 key = f"{prefix}{k}"
                 out.update(flat(v, key + ".") if isinstance(v, dict) else {key: v})
             return out
 
         before, after = flat(saved), flat(self.cfg.to_dict())
-        changed = sorted(k for k in after if k in before and before[k] != after[k]
-                         and k != "training.resume")
+        changed = sorted(
+            k
+            for k in after
+            if k in before and before[k] != after[k] and k != "training.resume"
+        )
         if changed:
             logger.info(f"resuming with changed settings: {', '.join(changed)}")
 
-    def _trainer_state(self) -> Dict[str, Any]:
+    def _trainer_state(self) -> dict[str, Any]:
         return {
             "history": self.history,
             "best_val_loss": self.best_val_loss,
@@ -239,7 +274,7 @@ class Trainer:
             "current_lr": self.current_lr,
         }
 
-    def snapshot(self, metrics: Dict[str, float]) -> Dict[str, Any]:
+    def snapshot(self, metrics: dict[str, float]) -> dict[str, Any]:
         cfg = self.cfg.training
         return {
             "model": self.model,
@@ -262,12 +297,12 @@ class Trainer:
             "extra": self._payload_extra(),
         }
 
-    def _step_metrics(self) -> Dict[str, float]:
+    def _step_metrics(self) -> dict[str, float]:
         partial = {f"train_{k}": v for k, v in self.train_metrics.compute().items()}
         partial["lr"] = self.current_lr
         return partial
 
-    def _train_one_epoch(self) -> Dict[str, float]:
+    def _train_one_epoch(self) -> dict[str, float]:
         self.forward_model.train()
         self._before_epoch()
         skip = self.batch_in_epoch
@@ -287,12 +322,16 @@ class Trainer:
 
             self.optimizer.zero_grad(set_to_none=True)
 
-            loss, extra, batch_size = self.task.compute_loss(self.forward_model, batch, self.device)
+            loss, extra, batch_size = self.task.compute_loss(
+                self.forward_model, batch, self.device
+            )
 
             loss.backward()
 
             if self.cfg.training.grad_clip and self.cfg.training.grad_clip > 0:
-                nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg.training.grad_clip)
+                nn.utils.clip_grad_norm_(
+                    self.model.parameters(), self.cfg.training.grad_clip
+                )
 
             self.optimizer.step()
             self.global_step += 1
@@ -301,9 +340,13 @@ class Trainer:
             self.train_metrics.update(batch_size=batch_size, loss=loss.item(), **extra)
 
             if self.checkpoints.history_due(step=self.global_step):
-                self.checkpoints.save_history_checkpoint(self.snapshot(self._step_metrics()))
+                self.checkpoints.save_history_checkpoint(
+                    self.snapshot(self._step_metrics())
+                )
             if self.checkpoints.live_due(step=self.global_step):
-                self.checkpoints.save_live_checkpoint(self.snapshot(self._step_metrics()))
+                self.checkpoints.save_live_checkpoint(
+                    self.snapshot(self._step_metrics())
+                )
 
         if self._resume_rng is not None:
             restore_rng(self._resume_rng)
@@ -324,18 +367,20 @@ class Trainer:
             group["lr"] = self.current_lr
 
     @torch.no_grad()
-    def evaluate(self, split: str) -> Dict[str, float]:
+    def evaluate(self, split: str) -> dict[str, float]:
         loader: DataLoader = self.loaders[split]
         self.model.eval()
         metrics = MetricAccumulator()
 
         for batch in loader:
-            loss, extra, batch_size = self.task.compute_loss(self.model, batch, self.device)
+            loss, extra, batch_size = self.task.compute_loss(
+                self.model, batch, self.device
+            )
             metrics.update(batch_size=batch_size, loss=loss.item(), **extra)
 
         return metrics.compute()
 
-    def fit(self) -> Dict[str, Any]:
+    def fit(self) -> dict[str, Any]:
         cfg = self.cfg
         self._log_run_header()
 
@@ -354,7 +399,7 @@ class Trainer:
             train_metrics = self._train_one_epoch()
             val_metrics = self.evaluate("val")
 
-            record: Dict[str, float] = {"epoch": epoch, "lr": self.current_lr}
+            record: dict[str, float] = {"epoch": epoch, "lr": self.current_lr}
             for key, value in train_metrics.items():
                 record[f"train_{key}"] = value
             for key, value in val_metrics.items():
@@ -423,36 +468,48 @@ class Trainer:
         logger.info(section(f"TRAINING RUN: {cfg.run_name}"))
         logger.info(f"task              : {cfg.task}")
         logger.info(f"device            : {self.device}")
-        logger.info(f"seed              : {cfg.seed} (deterministic={cfg.deterministic})")
+        logger.info(
+            f"seed              : {cfg.seed} (deterministic={cfg.deterministic})"
+        )
         if self.resumed_from:
             logger.info(f"resumed from      : {self.resumed_from}")
         logger.info("")
         logger.info("DATA")
         for line in self.task.describe_data(self.datasets):
             logger.info(f"  {line}")
-        logger.info(f"  batch size    : {cfg.data.batch_size} "
-                    f"({self.steps_per_epoch} weight updates per epoch, "
-                    f"{self.total_steps:,} in total)")
+        logger.info(
+            f"  batch size    : {cfg.data.batch_size} "
+            f"({self.steps_per_epoch} weight updates per epoch, "
+            f"{self.total_steps:,} in total)"
+        )
         logger.info("")
         logger.info("MODEL")
         logger.info(f"  architecture  : {_describe_architecture(description)}")
-        logger.info(f"  parameters    : {description['parameters']:,} trainable numbers")
+        logger.info(
+            f"  parameters    : {description['parameters']:,} trainable numbers"
+        )
         logger.info("")
         logger.info("OPTIMISATION")
         logger.info(f"  loss          : {type(self.criterion).__name__}")
-        logger.info(f"  optimizer     : {cfg.training.optimizer} (lr={cfg.training.learning_rate}, "
-                    f"weight_decay={cfg.training.weight_decay})")
+        logger.info(
+            f"  optimizer     : {cfg.training.optimizer} (lr={cfg.training.learning_rate}, "
+            f"weight_decay={cfg.training.weight_decay})"
+        )
         if cfg.training.scheduler != "none":
-            logger.info(f"  schedule      : {cfg.training.scheduler} "
-                        f"(warmup {cfg.training.warmup_steps} steps, "
-                        f"final lr x{cfg.training.min_lr_ratio})")
-        logger.info(f"  epochs        : {cfg.training.epochs} "
-                    f"(early stopping patience {cfg.training.early_stopping_patience})")
+            logger.info(
+                f"  schedule      : {cfg.training.scheduler} "
+                f"(warmup {cfg.training.warmup_steps} steps, "
+                f"final lr x{cfg.training.min_lr_ratio})"
+            )
+        logger.info(
+            f"  epochs        : {cfg.training.epochs} "
+            f"(early stopping patience {cfg.training.early_stopping_patience})"
+        )
         logger.info("")
         logger.info(f"Legend: {_legend(self.task.metric_names)}")
         logger.info("-" * 78)
 
-    def _log_epoch(self, epoch: int, record: Dict[str, float], improved: bool) -> None:
+    def _log_epoch(self, epoch: int, record: dict[str, float], improved: bool) -> None:
         cfg = self.cfg
         is_edge = epoch == 1 or epoch == cfg.training.epochs
         if not (is_edge or epoch % cfg.training.log_every == 0):
@@ -471,40 +528,58 @@ class Trainer:
     def _log_summary(self, elapsed: float, stopped_early: bool) -> None:
         if not self.history:
             logger.info(section("NOTHING TO TRAIN"))
-            logger.info(f"the run is already at epoch {self.epoch} of {self.cfg.training.epochs}")
+            logger.info(
+                f"the run is already at epoch {self.epoch} of {self.cfg.training.epochs}"
+            )
             return
         first = self.history[0]
         last = self.history[-1]
 
         logger.info(section("TRAINING COMPLETE"))
-        logger.info(f"epochs run        : {len(self.history)}"
-                    f"{' (stopped early)' if stopped_early else ''}")
+        logger.info(
+            f"epochs run        : {len(self.history)}"
+            f"{' (stopped early)' if stopped_early else ''}"
+        )
         logger.info(f"wall clock        : {elapsed:.1f}s")
         if self.checkpoints.best_value is not None:
-            logger.info(f"best {self.checkpoints.rule.metric:<13}: "
-                        f"{self.checkpoints.best_value:.6f} (epoch {self.best_epoch})")
+            logger.info(
+                f"best {self.checkpoints.rule.metric:<13}: "
+                f"{self.checkpoints.best_value:.6f} (epoch {self.best_epoch})"
+            )
         logger.info("")
         logger.info("DID IT LEARN?  (first epoch  ->  last epoch)")
-        logger.info(f"  train loss      : {first['train_loss']:.4f}  ->  {last['train_loss']:.4f}")
-        logger.info(f"  val   loss      : {first['val_loss']:.4f}  ->  {last['val_loss']:.4f}")
+        logger.info(
+            f"  train loss      : {first['train_loss']:.4f}  ->  {last['train_loss']:.4f}"
+        )
+        logger.info(
+            f"  val   loss      : {first['val_loss']:.4f}  ->  {last['val_loss']:.4f}"
+        )
         for name in self.task.metric_names:
             label = f"val {name}".replace("_", "-")
-            logger.info(f"  {label:<16}: {_format_metric(name, first[f'val_{name}'])}"
-                        f"  ->  {_format_metric(name, last[f'val_{name}'])}")
+            logger.info(
+                f"  {label:<16}: {_format_metric(name, first[f'val_{name}'])}"
+                f"  ->  {_format_metric(name, last[f'val_{name}'])}"
+            )
         logger.info("")
         logger.info("HOW THE WEIGHTS CHANGED  (|w| = length of the parameter tensor)")
         rows = summarise_weight_change(self.initial_parameters, self.model)
         logger.info(format_weight_change(rows))
         logger.info("")
         logger.info("'moved' is the distance each tensor travelled from its random")
-        logger.info("starting point; 'rel' is that distance relative to where it started.")
+        logger.info(
+            "starting point; 'rel' is that distance relative to where it started."
+        )
         logger.info("A layer that learned nothing would sit near 0%.")
         logger.info("")
-        logger.info(f"checkpoints       : {self.checkpoint_dir}/best.pt (best), "
-                    f"{self.checkpoint_dir}/live.pt (resume with --set training.resume=live)")
+        logger.info(
+            f"checkpoints       : {self.checkpoint_dir}/best.pt (best), "
+            f"{self.checkpoint_dir}/live.pt (resume with --set training.resume=live)"
+        )
         if self.checkpoints.settings.keep_history:
-            logger.info(f"history           : {len(self.checkpoints.history_files())} snapshots in "
-                        f"{self.checkpoints.history_dir}")
+            logger.info(
+                f"history           : {len(self.checkpoints.history_files())} snapshots in "
+                f"{self.checkpoints.history_dir}"
+            )
         for error in self.checkpoints.upload_errors:
             logger.info(f"NOT UPLOADED      : {error}")
         logger.info(f"per-epoch history : {self.checkpoint_dir}/history.json")
@@ -514,36 +589,45 @@ class Trainer:
             logger.info(f"  {line}")
 
 
-def train(cfg: Config, ensure_dataset: bool = True) -> Dict[str, Any]:
+def train(cfg: Config, ensure_dataset: bool = True) -> dict[str, Any]:
     if cfg.data.source == "tokens":
         from ored.training.pretrain import PretrainTrainer
+
         return PretrainTrainer(cfg).fit()
     if cfg.data.source == "supabase":
         from ored.training.dataset_run import run_supabase_training
+
         return run_supabase_training(cfg)
     if cfg.task == "language_model":
-        logger.info("data.source is generated: this run does NOT read ored_training_data "
-                    "(remove --generated-corpus / data.source=generated to train on Supabase data)")
+        logger.info(
+            "data.source is generated: this run does NOT read ored_training_data "
+            "(remove --generated-corpus / data.source=generated to train on Supabase data)"
+        )
     if ensure_dataset:
         if not (Path(cfg.data.corpus.dir) / "train.txt").exists():
             from ored.data.corpus import generate_corpus
+
             logger.info("corpus missing -- generating it first")
             generate_corpus(cfg)
     return Trainer(cfg).fit()
 
 
-def checkpoint_overrides(args: argparse.Namespace) -> List[str]:
+def checkpoint_overrides(args: argparse.Namespace) -> list[str]:
     overrides = []
     if args.resume_live:
         overrides.append("training.resume=live")
     if args.init_from:
         overrides.append(f"training.resume={args.init_from}")
     if args.history_every is not None:
-        overrides += ["checkpoint.keep_history=true",
-                      f"checkpoint.save_history_every_epochs={args.history_every}"]
+        overrides += [
+            "checkpoint.keep_history=true",
+            f"checkpoint.save_history_every_epochs={args.history_every}",
+        ]
     if args.history_every_steps is not None:
-        overrides += ["checkpoint.keep_history=true",
-                      f"checkpoint.save_history_every_steps={args.history_every_steps}"]
+        overrides += [
+            "checkpoint.keep_history=true",
+            f"checkpoint.save_history_every_steps={args.history_every_steps}",
+        ]
     if args.live_every_steps is not None:
         overrides.append(f"checkpoint.save_live_every_steps={args.live_every_steps}")
     if args.upload:
@@ -552,36 +636,83 @@ def checkpoint_overrides(args: argparse.Namespace) -> List[str]:
 
 
 def add_dataset_arguments(parser: argparse.ArgumentParser) -> None:
-    group = parser.add_argument_group("training data from Supabase (ored_training_data)")
-    group.add_argument("--supabase-dataset", "--dataset-tag", dest="supabase_dataset", nargs="?",
-                       const="all", metavar="TAG",
-                       help="train on a snapshot of ored_training_data rows with this dataset_tag "
-                            "('all' or no value: every row)")
-    group.add_argument("--type", dest="types", action="append", default=[], metavar="TYPE")
-    group.add_argument("--category", dest="categories", action="append", default=[], metavar="CATEGORY")
-    group.add_argument("--subject", dest="subjects", action="append", default=[], metavar="SUBJECT")
-    group.add_argument("--language", dest="languages", action="append", default=[], metavar="LANG")
+    group = parser.add_argument_group(
+        "training data from Supabase (ored_training_data)"
+    )
+    group.add_argument(
+        "--supabase-dataset",
+        "--dataset-tag",
+        dest="supabase_dataset",
+        nargs="?",
+        const="all",
+        metavar="TAG",
+        help="train on a snapshot of ored_training_data rows with this dataset_tag "
+        "('all' or no value: every row)",
+    )
+    group.add_argument(
+        "--type", dest="types", action="append", default=[], metavar="TYPE"
+    )
+    group.add_argument(
+        "--category", dest="categories", action="append", default=[], metavar="CATEGORY"
+    )
+    group.add_argument(
+        "--subject", dest="subjects", action="append", default=[], metavar="SUBJECT"
+    )
+    group.add_argument(
+        "--language", dest="languages", action="append", default=[], metavar="LANG"
+    )
     verified = group.add_mutually_exclusive_group()
-    verified.add_argument("--verified-only", action="store_true",
-                          help="only enabled and verified rows (the default)")
-    verified.add_argument("--include-unverified", action="store_true",
-                          help="also train on enabled rows nobody has verified yet")
-    group.add_argument("--skip-invalid", action="store_true",
-                       help="leave invalid rows out (listed in the manifest) instead of stopping")
-    group.add_argument("--snapshot", metavar="HASH", help="reuse this snapshot instead of taking a new one")
-    group.add_argument("--split-seed", type=int, metavar="N", help="seed of the train/val/test split")
+    verified.add_argument(
+        "--verified-only",
+        action="store_true",
+        help="only enabled and verified rows (the default)",
+    )
+    verified.add_argument(
+        "--include-unverified",
+        action="store_true",
+        help="also train on enabled rows nobody has verified yet",
+    )
+    group.add_argument(
+        "--skip-invalid",
+        action="store_true",
+        help="leave invalid rows out (listed in the manifest) instead of stopping",
+    )
+    group.add_argument(
+        "--snapshot",
+        metavar="HASH",
+        help="reuse this snapshot instead of taking a new one",
+    )
+    group.add_argument(
+        "--split-seed", type=int, metavar="N", help="seed of the train/val/test split"
+    )
     group.add_argument("--notes", default=None, help="a note stored with the snapshot")
-    group.add_argument("--generated-corpus", action="store_true",
-                       help="train on the generated corpus in data.corpus.dir instead of Supabase data "
-                            "(the explicit opt-out; the configs default to data.source: supabase)")
+    group.add_argument(
+        "--generated-corpus",
+        action="store_true",
+        help="train on the generated corpus in data.corpus.dir instead of Supabase data "
+        "(the explicit opt-out; the configs default to data.source: supabase)",
+    )
 
 
-def apply_dataset_arguments(cfg: Config, args: argparse.Namespace, overrides: List[str]) -> None:
-    has_filters = any((args.types, args.categories, args.subjects, args.languages,
-                       args.include_unverified, args.skip_invalid, args.snapshot))
+def apply_dataset_arguments(
+    cfg: Config, args: argparse.Namespace, overrides: list[str]
+) -> None:
+    has_filters = any(
+        (
+            args.types,
+            args.categories,
+            args.subjects,
+            args.languages,
+            args.include_unverified,
+            args.skip_invalid,
+            args.snapshot,
+        )
+    )
     if getattr(args, "generated_corpus", False):
         if args.supabase_dataset is not None or has_filters:
-            raise ValueError("--generated-corpus cannot be combined with --supabase-dataset or its filters")
+            raise ValueError(
+                "--generated-corpus cannot be combined with --supabase-dataset or its filters"
+            )
         cfg.data.source = "generated"
         return
     if args.supabase_dataset is None and not has_filters:
@@ -606,30 +737,62 @@ def apply_dataset_arguments(cfg: Config, args: argparse.Namespace, overrides: Li
         settings.split_seed = args.split_seed
     if args.notes is not None:
         settings.notes = args.notes
-    if (args.supabase_dataset is not None and not args.run_name
-            and not any(o.strip().startswith("run_name=") for o in overrides)):
+    if (
+        args.supabase_dataset is not None
+        and not args.run_name
+        and not any(o.strip().startswith("run_name=") for o in overrides)
+    ):
         from ored.data.snapshot import safe_tag
+
         cfg.run_name = f"{cfg.run_name}-{safe_tag(settings.dataset_tag)}"
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Train an Ored AI model.")
     parser.add_argument("--config", default="configs/ored50m.yaml")
-    parser.add_argument("--set", dest="overrides", action="append", default=[],
-                        metavar="KEY=VALUE", help="override a config value (repeatable)")
+    parser.add_argument(
+        "--set",
+        dest="overrides",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="override a config value (repeatable)",
+    )
     start = parser.add_mutually_exclusive_group()
-    start.add_argument("--resume-live", action="store_true",
-                       help="continue this run exactly from checkpoints/<run_name>/live.pt")
-    start.add_argument("--init-from", metavar="PATH",
-                       help="start a new run from another checkpoint's weights")
-    parser.add_argument("--history-every", type=int, metavar="EPOCHS",
-                        help="keep a history snapshot every N epochs")
-    parser.add_argument("--history-every-steps", type=int, metavar="STEPS",
-                        help="keep a history snapshot every N steps")
-    parser.add_argument("--live-every-steps", type=int, metavar="STEPS",
-                        help="also save live.pt every N steps, not just every epoch")
-    parser.add_argument("--upload", action="store_true", help="publish checkpoints to Supabase")
-    parser.add_argument("--run-name", metavar="NAME", help="name of the run (checkpoints/<NAME>/)")
+    start.add_argument(
+        "--resume-live",
+        action="store_true",
+        help="continue this run exactly from checkpoints/<run_name>/live.pt",
+    )
+    start.add_argument(
+        "--init-from",
+        metavar="PATH",
+        help="start a new run from another checkpoint's weights",
+    )
+    parser.add_argument(
+        "--history-every",
+        type=int,
+        metavar="EPOCHS",
+        help="keep a history snapshot every N epochs",
+    )
+    parser.add_argument(
+        "--history-every-steps",
+        type=int,
+        metavar="STEPS",
+        help="keep a history snapshot every N steps",
+    )
+    parser.add_argument(
+        "--live-every-steps",
+        type=int,
+        metavar="STEPS",
+        help="also save live.pt every N steps, not just every epoch",
+    )
+    parser.add_argument(
+        "--upload", action="store_true", help="publish checkpoints to Supabase"
+    )
+    parser.add_argument(
+        "--run-name", metavar="NAME", help="name of the run (checkpoints/<NAME>/)"
+    )
     parser.add_argument("--seed", type=int, help="training seed")
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--batch-size", type=int)
@@ -637,7 +800,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     overrides = args.overrides + checkpoint_overrides(args)
-    for flag, key in (("seed", "seed"), ("epochs", "training.epochs"), ("batch_size", "data.batch_size")):
+    for flag, key in (
+        ("seed", "seed"),
+        ("epochs", "training.epochs"),
+        ("batch_size", "data.batch_size"),
+    ):
         if getattr(args, flag) is not None:
             overrides.append(f"{key}={getattr(args, flag)}")
     cfg = load_config(args.config, overrides)

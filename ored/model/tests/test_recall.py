@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from ored.data.facts import Fact, FactSpec, generate_fact_corpus
 from ored.evaluation.recall import (
     RecallError,
@@ -20,16 +19,19 @@ def spec():
     return FactSpec(
         questions=[],
         facts=[
-            Fact(question="What is velocity?", category="physics",
-                 answer="Speed with a direction."),
-            Fact(question="What is a verb?", category="english",
-                 answer="A doing word."),
+            Fact(
+                question="What is velocity?",
+                category="physics",
+                answer="Speed with a direction.",
+            ),
+            Fact(
+                question="What is a verb?", category="english", answer="A doing word."
+            ),
         ],
     ).validate()
 
 
 class FakePredictor:
-
     def __init__(self, replies):
         self.replies = replies
         self.checkpoint_info = {"path": "fake.pt"}
@@ -37,6 +39,7 @@ class FakePredictor:
     def predict(self, prompt, max_new_tokens=8):
         class Written:
             completion = self.replies.get(prompt.strip(), "")
+
         return Written()
 
 
@@ -59,8 +62,10 @@ def test_the_expected_answer_keeps_its_own_ending():
 
 
 def test_every_right_answer_scores(spec):
-    facts = [{"question": f.question, "answer": f.answer, "category": f.category}
-             for f in spec.facts]
+    facts = [
+        {"question": f.question, "answer": f.answer, "category": f.category}
+        for f in spec.facts
+    ]
     predictor = FakePredictor({f["question"]: f["answer"] for f in facts})
 
     report = score(predictor, facts, [])
@@ -72,8 +77,10 @@ def test_every_right_answer_scores(spec):
 
 
 def test_a_wrong_answer_is_recorded_with_what_was_written(spec):
-    facts = [{"question": f.question, "answer": f.answer, "category": f.category}
-             for f in spec.facts]
+    facts = [
+        {"question": f.question, "answer": f.answer, "category": f.category}
+        for f in spec.facts
+    ]
     predictor = FakePredictor({"What is velocity?": "Speed with a direction."})
 
     report = score(predictor, facts, [])
@@ -86,8 +93,10 @@ def test_a_wrong_answer_is_recorded_with_what_was_written(spec):
 
 
 def test_scores_are_broken_down_by_category(spec):
-    facts = [{"question": f.question, "answer": f.answer, "category": f.category}
-             for f in spec.facts]
+    facts = [
+        {"question": f.question, "answer": f.answer, "category": f.category}
+        for f in spec.facts
+    ]
     predictor = FakePredictor({"What is velocity?": "Speed with a direction."})
 
     report = score(predictor, facts, [])
@@ -126,12 +135,18 @@ def test_the_cli_scores_a_trained_checkpoint(tiny_lm_cfg, spec):
     generate_fact_corpus(tiny_lm_cfg, spec, repeats=3)
     Trainer(tiny_lm_cfg).fit()
 
-    exit_code = recall_main([
-        "--checkpoint", str(tiny_lm_cfg.checkpoint_dir / "best.pt"),
-        "--corpus", str(tiny_lm_cfg.data.corpus.dir),
-        "--device", "cpu",
-        "--tokens", "20",
-    ])
+    exit_code = recall_main(
+        [
+            "--checkpoint",
+            str(tiny_lm_cfg.checkpoint_dir / "best.pt"),
+            "--corpus",
+            str(tiny_lm_cfg.data.corpus.dir),
+            "--device",
+            "cpu",
+            "--tokens",
+            "20",
+        ]
+    )
 
     assert exit_code == 0
 

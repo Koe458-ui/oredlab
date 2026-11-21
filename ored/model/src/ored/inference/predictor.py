@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Type
+from typing import Any, Type
 
 import torch
 
@@ -19,11 +20,11 @@ logger = get_logger(__name__)
 
 DEFAULT_CHECKPOINT = "checkpoints/ored50m/best.pt"
 
-PREDICTOR_REGISTRY: Dict[str, Type["BasePredictor"]] = {}
+PREDICTOR_REGISTRY: dict[str, type[BasePredictor]] = {}
 
 
 def register_predictor(task: str):
-    def decorator(cls: Type["BasePredictor"]) -> Type["BasePredictor"]:
+    def decorator(cls: type[BasePredictor]) -> type[BasePredictor]:
         key = task.lower()
         if key in PREDICTOR_REGISTRY:
             raise ValueError(f"predictor for task {task!r} is already registered")
@@ -37,12 +38,12 @@ def register_predictor(task: str):
 TEXT_MODELS = frozenset({"transformer"})
 
 
-def find_tokenizer_data(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def find_tokenizer_data(payload: dict[str, Any]) -> dict[str, Any] | None:
     extra = payload.get("extra") or {}
     return payload.get("tokenizer") or extra.get("tokenizer")
 
 
-def read_tokenizer(payload: Dict[str, Any], path: str | Path) -> Tokenizer:
+def read_tokenizer(payload: dict[str, Any], path: str | Path) -> Tokenizer:
     data = find_tokenizer_data(payload)
     if not data:
         raise ValueError(
@@ -52,7 +53,7 @@ def read_tokenizer(payload: Dict[str, Any], path: str | Path) -> Tokenizer:
     return Tokenizer.from_dict(data)
 
 
-def resolve_task(payload: Dict[str, Any], cfg: Config, path: str | Path) -> str:
+def resolve_task(payload: dict[str, Any], cfg: Config, path: str | Path) -> str:
     declared = (cfg.task or "").lower()
     has_tokenizer = find_tokenizer_data(payload) is not None
 
@@ -76,17 +77,16 @@ def resolve_task(payload: Dict[str, Any], cfg: Config, path: str | Path) -> str:
 
 @dataclass
 class TextPrediction:
-
     prompt: str
     completion: str
-    expected: Optional[str] = None
+    expected: str | None = None
 
     @property
     def text(self) -> str:
         return f"{self.prompt}{self.completion}"
 
     @property
-    def correct(self) -> Optional[bool]:
+    def correct(self) -> bool | None:
         if self.expected is None:
             return None
         return self.completion.strip() == self.expected.strip()
@@ -99,11 +99,15 @@ class TextPrediction:
 
 
 class BasePredictor:
-
     task: str = "base"
 
-    def __init__(self, model: torch.nn.Module, cfg: Config, device: torch.device,
-                 checkpoint_info: Dict[str, Any]) -> None:
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        cfg: Config,
+        device: torch.device,
+        checkpoint_info: dict[str, Any],
+    ) -> None:
         self.model = model
         self.cfg = cfg
         self.device = device
@@ -116,7 +120,7 @@ class BasePredictor:
         cls,
         path: str | Path = DEFAULT_CHECKPOINT,
         device: str = "auto",
-    ) -> "BasePredictor":
+    ) -> BasePredictor:
         resolved_device = resolve_device(device)
         payload = load_for_inference(path, map_location=resolved_device)
         cfg = config_from_dict(payload["config"])
@@ -143,8 +147,13 @@ class BasePredictor:
         return target._build(payload, cfg, resolved_device, info)
 
     @classmethod
-    def _build(cls, payload: Dict[str, Any], cfg: Config, device: torch.device,
-               info: Dict[str, Any]) -> "BasePredictor":
+    def _build(
+        cls,
+        payload: dict[str, Any],
+        cfg: Config,
+        device: torch.device,
+        info: dict[str, Any],
+    ) -> BasePredictor:
         raise NotImplementedError
 
     def _describe_header(self) -> str:
@@ -165,9 +174,14 @@ class BasePredictor:
 
 @register_predictor("language_model")
 class LanguageModelPredictor(BasePredictor):
-
-    def __init__(self, model: torch.nn.Module, cfg: Config, device: torch.device,
-                 checkpoint_info: Dict[str, Any], tokenizer: Tokenizer) -> None:
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        cfg: Config,
+        device: torch.device,
+        checkpoint_info: dict[str, Any],
+        tokenizer: Tokenizer,
+    ) -> None:
         super().__init__(model, cfg, device, checkpoint_info)
         self.tokenizer = tokenizer
         self.block_size = cfg.data.block_size
@@ -188,8 +202,9 @@ class LanguageModelPredictor(BasePredictor):
     def reverse_answer(self) -> bool:
         return self.cfg.data.corpus.reverse_answer
 
-    def predict(self, prompt: str, max_new_tokens: int = 8,
-                expected: Optional[str] = None) -> TextPrediction:
+    def predict(
+        self, prompt: str, max_new_tokens: int = 8, expected: str | None = None
+    ) -> TextPrediction:
         written = complete(
             model=self.model,
             tokenizer=self.tokenizer,
@@ -211,10 +226,10 @@ class LanguageModelPredictor(BasePredictor):
     def generate(
         self,
         prompt: str = "",
-        max_new_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-        top_k: Optional[int] = None,
-        top_p: Optional[float] = None,
+        max_new_tokens: int | None = None,
+        temperature: float | None = None,
+        top_k: int | None = None,
+        top_p: float | None = None,
         greedy: bool = False,
     ) -> str:
         gen = self.cfg.generation
@@ -222,7 +237,9 @@ class LanguageModelPredictor(BasePredictor):
             model=self.model,
             tokenizer=self.tokenizer,
             prompt=prompt if prompt else gen.prompt,
-            max_new_tokens=max_new_tokens if max_new_tokens is not None else gen.max_new_tokens,
+            max_new_tokens=max_new_tokens
+            if max_new_tokens is not None
+            else gen.max_new_tokens,
             block_size=self.block_size,
             device=self.device,
             temperature=temperature if temperature is not None else gen.temperature,
@@ -239,12 +256,14 @@ def resolve_checkpoint(path: str | Path | None = None) -> str:
     return str(path) if path is not None else DEFAULT_CHECKPOINT
 
 
-def load_predictor(path: str | Path | None = None, device: str = "auto") -> BasePredictor:
+def load_predictor(
+    path: str | Path | None = None, device: str = "auto"
+) -> BasePredictor:
     return BasePredictor.from_checkpoint(resolve_checkpoint(path), device)
 
 
-def _parse_pairs(tokens: Sequence[str]) -> List[Tuple[int, int]]:
-    pairs: List[Tuple[int, int]] = []
+def _parse_pairs(tokens: Sequence[str]) -> list[tuple[int, int]]:
+    pairs: list[tuple[int, int]] = []
     for token in tokens:
         if "+" not in token:
             raise SystemExit(f"--pairs expects A+B tokens, got {token!r}")
@@ -253,7 +272,9 @@ def _parse_pairs(tokens: Sequence[str]) -> List[Tuple[int, int]]:
     return pairs
 
 
-def _run_language_model(predictor: LanguageModelPredictor, args: argparse.Namespace) -> int:
+def _run_language_model(
+    predictor: LanguageModelPredictor, args: argparse.Namespace
+) -> int:
     did_something = False
 
     for question in args.ask or []:
@@ -267,17 +288,20 @@ def _run_language_model(predictor: LanguageModelPredictor, args: argparse.Namesp
 
     if args.text is not None:
         if args.sample:
-            logger.info(predictor.generate(
-                prompt=args.text,
-                max_new_tokens=args.tokens,
-                temperature=args.temperature,
-            ))
+            logger.info(
+                predictor.generate(
+                    prompt=args.text,
+                    max_new_tokens=args.tokens,
+                    temperature=args.temperature,
+                )
+            )
         else:
-            logger.info(predictor.predict(
-                args.text, max_new_tokens=args.tokens or 8).format())
+            logger.info(
+                predictor.predict(args.text, max_new_tokens=args.tokens or 8).format()
+            )
         did_something = True
 
-    pairs: List[Tuple[int, int]] = []
+    pairs: list[tuple[int, int]] = []
     if args.a is not None and args.b is not None:
         pairs.append((args.a, args.b))
     pairs.extend(_parse_pairs(args.pairs or []))
@@ -287,11 +311,13 @@ def _run_language_model(predictor: LanguageModelPredictor, args: argparse.Namesp
             logger.info("(no input given -- showing a default sample)")
             logger.info("")
             logger.info("generated text:")
-            logger.info(predictor.generate(
-                max_new_tokens=args.tokens or 160,
-                temperature=args.temperature,
-                greedy=not args.sample,
-            ))
+            logger.info(
+                predictor.generate(
+                    max_new_tokens=args.tokens or 160,
+                    temperature=args.temperature,
+                    greedy=not args.sample,
+                )
+            )
             logger.info("")
             logger.info("completions:")
         pairs = [(0, 0), (1, 1), (3, 4), (9, 6), (7, 8), (15, 15)]
@@ -311,44 +337,77 @@ def _run_language_model(predictor: LanguageModelPredictor, args: argparse.Namesp
                 break
             if not raw.strip():
                 continue
-            logger.info(predictor.predict(raw, max_new_tokens=args.tokens or 8).format())
+            logger.info(
+                predictor.predict(raw, max_new_tokens=args.tokens or 8).format()
+            )
 
     return 0
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run inference with a trained Ored AI model.",
         epilog="Examples:\n"
-               '  python scripts/infer.py --text \"17 + 9 = \"\n'
-               "  python scripts/infer.py --pairs 1+1 7+8 15+15\n"
-               '  python scripts/infer.py --ask \"What is a planet?\"\n'
-               "  python scripts/infer.py --interactive",
+        '  python scripts/infer.py --text "17 + 9 = "\n'
+        "  python scripts/infer.py --pairs 1+1 7+8 15+15\n"
+        '  python scripts/infer.py --ask "What is a planet?"\n'
+        "  python scripts/infer.py --interactive",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--checkpoint", default=None,
-                        help=f"default: {DEFAULT_CHECKPOINT}")
+    parser.add_argument(
+        "--checkpoint", default=None, help=f"default: {DEFAULT_CHECKPOINT}"
+    )
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--a", type=int, help="first number")
     parser.add_argument("--b", type=int, help="second number")
-    parser.add_argument("--pairs", nargs="*", default=None,
-                        metavar="A+B", help="several pairs at once, e.g. 3+4 9+6")
-    parser.add_argument("--text", default=None, metavar="TEXT",
-                        help="language models only: text to continue, e.g. \"17 + 9 = \"")
-    parser.add_argument("--ask", action="append", default=[], metavar="QUESTION",
-                        help="language models trained on Supabase data: ask a question in the "
-                             "'Question: ... / Answer: ...' form they learned (repeatable)")
-    parser.add_argument("--ask-type", default="qna", metavar="TYPE",
-                        help="the row type whose text form --ask uses (default qna)")
-    parser.add_argument("--tokens", type=int, default=None,
-                        help="language models only: how many characters to write")
-    parser.add_argument("--temperature", type=float, default=None,
-                        help="language models only: sampling temperature (needs --sample)")
-    parser.add_argument("--sample", action="store_true",
-                        help="language models only: sample freely instead of "
-                             "finishing one line greedily")
-    parser.add_argument("--interactive", action="store_true",
-                        help="type inputs until you enter 'q'")
+    parser.add_argument(
+        "--pairs",
+        nargs="*",
+        default=None,
+        metavar="A+B",
+        help="several pairs at once, e.g. 3+4 9+6",
+    )
+    parser.add_argument(
+        "--text",
+        default=None,
+        metavar="TEXT",
+        help='language models only: text to continue, e.g. "17 + 9 = "',
+    )
+    parser.add_argument(
+        "--ask",
+        action="append",
+        default=[],
+        metavar="QUESTION",
+        help="language models trained on Supabase data: ask a question in the "
+        "'Question: ... / Answer: ...' form they learned (repeatable)",
+    )
+    parser.add_argument(
+        "--ask-type",
+        default="qna",
+        metavar="TYPE",
+        help="the row type whose text form --ask uses (default qna)",
+    )
+    parser.add_argument(
+        "--tokens",
+        type=int,
+        default=None,
+        help="language models only: how many characters to write",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=None,
+        help="language models only: sampling temperature (needs --sample)",
+    )
+    parser.add_argument(
+        "--sample",
+        action="store_true",
+        help="language models only: sample freely instead of "
+        "finishing one line greedily",
+    )
+    parser.add_argument(
+        "--interactive", action="store_true", help="type inputs until you enter 'q'"
+    )
     parser.add_argument("--quiet", action="store_true", help="print predictions only")
     args = parser.parse_args(argv)
 

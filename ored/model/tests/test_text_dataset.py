@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import pytest
 import torch
-
 from ored.data.corpus import load_arithmetic_pairs, make_arithmetic, read_corpus
-from ored.data.text_dataset import TextDataset, build_text_dataloaders, build_text_datasets
+from ored.data.text_dataset import (
+    TextDataset,
+    build_text_dataloaders,
+    build_text_datasets,
+)
 
 
 def test_targets_are_inputs_shifted_by_one():
@@ -47,11 +50,14 @@ def test_held_out_sums_are_absent_from_training_text(tiny_corpus):
     pairs = load_arithmetic_pairs(tiny_corpus.data.corpus.dir)
     train_text = read_corpus(tiny_corpus.data.corpus.dir, "train")
     for a, b in pairs["test"]:
-        assert make_arithmetic(a, b) not in train_text, f"{a}+{b} leaked into training text"
+        assert make_arithmetic(a, b) not in train_text, (
+            f"{a}+{b} leaked into training text"
+        )
 
 
 def test_corpus_arithmetic_is_correct(tiny_corpus):
     import re
+
     text = read_corpus(tiny_corpus.data.corpus.dir, "train")
     pattern = re.compile(r"^(\d+) \+ (\d+) = (\d+)$")
     checked = 0

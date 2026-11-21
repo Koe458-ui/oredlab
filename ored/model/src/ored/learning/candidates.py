@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+
 
 from ored.learning.records import LearningCandidate, Message, Role
 
@@ -13,7 +14,7 @@ TOKEN_RE = re.compile(r"\b(?:sk|pk|sb|ey|ghp|xox)[A-Za-z0-9_\-.]{16,}\b")
 CARD_RE = re.compile(r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)")
 URL_CREDENTIALS_RE = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s/@]+:[^\s/@]+@")
 
-REDACTIONS: Tuple[Tuple[re.Pattern, str], ...] = (
+REDACTIONS: tuple[tuple[re.Pattern, str], ...] = (
     (URL_CREDENTIALS_RE, "[redacted-credentials]"),
     (TOKEN_RE, "[redacted-token]"),
     (EMAIL_RE, "[redacted-email]"),
@@ -24,7 +25,6 @@ REDACTIONS: Tuple[Tuple[re.Pattern, str], ...] = (
 
 @dataclass
 class CandidatePolicy:
-
     min_prompt_chars: int = 8
     min_response_chars: int = 8
     max_prompt_chars: int = 4000
@@ -32,7 +32,7 @@ class CandidatePolicy:
     drop_duplicates: bool = True
 
 
-def redact(text: str) -> Tuple[str, bool]:
+def redact(text: str) -> tuple[str, bool]:
     cleaned = text
     for pattern, placeholder in REDACTIONS:
         cleaned = pattern.sub(placeholder, cleaned)
@@ -44,10 +44,10 @@ def fingerprint(prompt: str, response: str) -> str:
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
-def pair_messages(messages: Sequence[Message]) -> List[Tuple[Message, Message]]:
+def pair_messages(messages: Sequence[Message]) -> list[tuple[Message, Message]]:
     ordered = sorted(messages, key=lambda m: m.created_at)
-    pairs: List[Tuple[Message, Message]] = []
-    pending: Optional[Message] = None
+    pairs: list[tuple[Message, Message]] = []
+    pending: Message | None = None
     for message in ordered:
         if message.role == Role.USER:
             pending = message
@@ -60,20 +60,26 @@ def pair_messages(messages: Sequence[Message]) -> List[Tuple[Message, Message]]:
 def build_candidates(
     conversation_id: str,
     messages: Sequence[Message],
-    policy: Optional[CandidatePolicy] = None,
-    seen: Optional[Dict[str, str]] = None,
-) -> List[LearningCandidate]:
+    policy: CandidatePolicy | None = None,
+    seen: dict[str, str] | None = None,
+) -> list[LearningCandidate]:
     policy = policy or CandidatePolicy()
     seen = seen if seen is not None else {}
-    candidates: List[LearningCandidate] = []
+    candidates: list[LearningCandidate] = []
 
     for prompt_message, response_message in pair_messages(messages):
         prompt, prompt_changed = redact(prompt_message.content.strip())
         response, response_changed = redact(response_message.content.strip())
 
-        if len(prompt) < policy.min_prompt_chars or len(response) < policy.min_response_chars:
+        if (
+            len(prompt) < policy.min_prompt_chars
+            or len(response) < policy.min_response_chars
+        ):
             continue
-        if len(prompt) > policy.max_prompt_chars or len(response) > policy.max_response_chars:
+        if (
+            len(prompt) > policy.max_prompt_chars
+            or len(response) > policy.max_response_chars
+        ):
             continue
 
         key = fingerprint(prompt, response)

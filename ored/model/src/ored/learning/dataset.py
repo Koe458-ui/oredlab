@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Sequence
+
 
 from ored.learning.records import TrainingExample
 from ored.learning.store import LearningStore
@@ -17,7 +18,6 @@ class DatasetError(RuntimeError):
 
 @dataclass
 class DatasetSpec:
-
     tag: str
     min_examples: int = 50
     min_conversations: int = 10
@@ -34,7 +34,6 @@ class DatasetSpec:
 
 @dataclass
 class DatasetReport:
-
     tag: str
     path: Path
     train: int
@@ -50,7 +49,9 @@ class DatasetReport:
         )
 
 
-def _split(examples: Sequence[TrainingExample], val_fraction: float) -> Dict[str, List[TrainingExample]]:
+def _split(
+    examples: Sequence[TrainingExample], val_fraction: float
+) -> dict[str, list[TrainingExample]]:
     ordered = sorted(examples, key=lambda e: e.id)
     cut = max(1, int(round(len(ordered) * (1.0 - val_fraction))))
     return {"train": ordered[:cut], "val": ordered[cut:]}
@@ -60,7 +61,7 @@ def export(
     store: LearningStore,
     spec: DatasetSpec,
     out_dir: str | Path = DEFAULT_EXPORT_DIR,
-    candidate_lookup: Dict[str, str] | None = None,
+    candidate_lookup: dict[str, str] | None = None,
 ) -> DatasetReport:
     spec.validate()
     examples = store.examples(spec.tag)
@@ -90,12 +91,18 @@ def export(
     with path.open("w", encoding="utf-8") as handle:
         for split, rows in parts.items():
             for example in rows:
-                handle.write(json.dumps({
-                    "split": split,
-                    "prompt": example.prompt,
-                    "response": example.response,
-                    "example_id": example.id,
-                }, ensure_ascii=False) + "\n")
+                handle.write(
+                    json.dumps(
+                        {
+                            "split": split,
+                            "prompt": example.prompt,
+                            "response": example.response,
+                            "example_id": example.id,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
 
     return DatasetReport(
         tag=spec.tag,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import torch
 import torch.nn.functional as F
@@ -26,7 +26,6 @@ DEFAULT_LIVE_DIR = "checkpoints/live"
 
 @dataclass
 class OnlinePolicy:
-
     learning_rate: float = 1e-5
     max_grad_norm: float = 1.0
     steps_per_message: int = 1
@@ -50,12 +49,11 @@ class OnlinePolicy:
 
 @dataclass
 class RemoteCheckpoints:
-
     store: Any
     files: CheckpointStore
     run_name: str = "live"
 
-    def push(self, path: Path, stats: Dict[str, Any]) -> None:
+    def push(self, path: Path, stats: dict[str, Any]) -> None:
         publish(
             store=self.store,
             files=self.files,
@@ -65,34 +63,35 @@ class RemoteCheckpoints:
         )
 
     def pull(self, path: Path) -> bool:
-        return fetch(
-            store=self.store,
-            files=self.files,
-            path=path,
-            kind=CheckpointKind.LIVE,
-            run_name=self.run_name,
-        ) is not None
+        return (
+            fetch(
+                store=self.store,
+                files=self.files,
+                path=path,
+                kind=CheckpointKind.LIVE,
+                run_name=self.run_name,
+            )
+            is not None
+        )
 
 
 @dataclass
 class OnlineResult:
-
     learned: bool
     reason: str = ""
-    loss: Optional[float] = None
+    loss: float | None = None
     tokens: int = 0
 
 
 @dataclass
 class OnlineStats:
-
     seen: int = 0
     learned: int = 0
     skipped: int = 0
     steps: int = 0
-    last_loss: Optional[float] = None
+    last_loss: float | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "seen": self.seen,
             "learned": self.learned,
@@ -103,17 +102,16 @@ class OnlineStats:
 
 
 class OnlineLearner:
-
     def __init__(
         self,
         model: torch.nn.Module,
         tokenizer: Tokenizer,
         cfg: Config,
         device: torch.device,
-        policy: Optional[OnlinePolicy] = None,
+        policy: OnlinePolicy | None = None,
         live_dir: str | Path = DEFAULT_LIVE_DIR,
         version: str = "live",
-        remote: Optional[RemoteCheckpoints] = None,
+        remote: RemoteCheckpoints | None = None,
         start_step: int = 0,
     ) -> None:
         self.policy = policy or OnlinePolicy()
@@ -138,10 +136,10 @@ class OnlineLearner:
         cls,
         path: str | Path = DEFAULT_CHECKPOINT,
         device: str = "auto",
-        policy: Optional[OnlinePolicy] = None,
+        policy: OnlinePolicy | None = None,
         live_dir: str | Path = DEFAULT_LIVE_DIR,
-        remote: Optional[RemoteCheckpoints] = None,
-    ) -> "OnlineLearner":
+        remote: RemoteCheckpoints | None = None,
+    ) -> OnlineLearner:
         model, tokenizer, cfg, info = load_language_model(path, device)
         return cls(
             model=model,
@@ -154,30 +152,30 @@ class OnlineLearner:
             start_step=int(info.get("global_step") or 0),
         )
 
-    def _encode(self, text: str) -> Tuple[List[int], float]:
+    def _encode(self, text: str) -> tuple[list[int], float]:
         ids = self.tokenizer.encode(text)
         if not ids:
             return [], 0.0
         known = sum(1 for i in ids if self.tokenizer.is_known(i))
         return ids, known / len(ids)
 
-    def _window(self, ids: List[int]) -> List[int]:
+    def _window(self, ids: list[int]) -> list[int]:
         limit = self.block_size + 1
         return ids[-limit:] if len(ids) > limit else ids
 
-    def _step(self, ids: List[int]) -> float:
+    def _step(self, ids: list[int]) -> float:
         batch = torch.tensor([ids], dtype=torch.long, device=self.device)
         x, y = batch[:, :-1], batch[:, 1:]
 
         self.model.train()
         logits = self.model(x)
-        loss = F.cross_entropy(
-            logits.reshape(-1, logits.size(-1)), y.reshape(-1)
-        )
+        loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), y.reshape(-1))
 
         self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.policy.max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(
+            self.model.parameters(), self.policy.max_grad_norm
+        )
         self.optimizer.step()
         self.model.eval()
 
@@ -222,7 +220,9 @@ class OnlineLearner:
         return OnlineResult(True, "", loss, len(ids))
 
     @torch.no_grad()
-    def reply(self, prompt: str, max_new_tokens: int = 160, temperature: float = 0.8) -> str:
+    def reply(
+        self, prompt: str, max_new_tokens: int = 160, temperature: float = 0.8
+    ) -> str:
         written = generate_text(
             model=self.model,
             tokenizer=self.tokenizer,
@@ -233,9 +233,13 @@ class OnlineLearner:
             temperature=temperature,
             stop_on_newline=True,
         )
-        return written[len(prompt):].strip() if written.startswith(prompt) else written.strip()
+        return (
+            written[len(prompt) :].strip()
+            if written.startswith(prompt)
+            else written.strip()
+        )
 
-    def respond(self, message: str) -> Tuple[str, OnlineResult]:
+    def respond(self, message: str) -> tuple[str, OnlineResult]:
         answer = self.reply(message)
         learned = self.learn(message if not answer else message + "\n" + answer)
         return answer, learned

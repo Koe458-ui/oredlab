@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from ored.config import Config
 from ored.data.snapshot import (
@@ -18,14 +18,15 @@ from ored.utils.logging_utils import get_logger, section
 logger = get_logger(__name__)
 
 
-def supabase_from_env(required: bool) -> Tuple[Any, Any]:
+def supabase_from_env(required: bool) -> tuple[Any, Any]:
     from ored.learning.supabase_store import SupabaseStore
 
     if not (os.environ.get("ORED_SB_URL") and os.environ.get("ORED_SB_SERVICE_KEY")):
         if required:
             raise SnapshotError(
                 "data.source is supabase: set ORED_SB_URL and ORED_SB_SERVICE_KEY (server side only) "
-                "so the trainer can read ored_training_data")
+                "so the trainer can read ored_training_data"
+            )
         return None, None
     return SupabaseStore.from_env(), dataset_files_from_env()
 
@@ -39,21 +40,25 @@ def pin_resumed_snapshot(cfg: Config) -> None:
         return
     from ored.utils.checkpoint import load_checkpoint
 
-    saved = ((load_checkpoint(live).get("config") or {}).get("data") or {}).get("supabase") or {}
+    saved = ((load_checkpoint(live).get("config") or {}).get("data") or {}).get(
+        "supabase"
+    ) or {}
     if saved.get("snapshot") and saved.get("dataset_tag") == settings.dataset_tag:
         settings.snapshot = saved["snapshot"]
-        logger.info(f"resuming live: training continues on the snapshot it started with, {settings.snapshot[:16]}")
+        logger.info(
+            f"resuming live: training continues on the snapshot it started with, {settings.snapshot[:16]}"
+        )
 
 
-def session_config(cfg: Config, prepared: PreparedDataset) -> Dict[str, Any]:
+def session_config(cfg: Config, prepared: PreparedDataset) -> dict[str, Any]:
     config = cfg.to_dict()
     config["dataset"] = prepared.link()
     return config
 
 
-def best_metrics(result: Dict[str, Any], trainer: Any) -> Dict[str, float]:
+def best_metrics(result: dict[str, Any], trainer: Any) -> dict[str, float]:
     last = result["history"][-1] if result["history"] else {}
-    metrics: Dict[str, float] = {
+    metrics: dict[str, float] = {
         "epochs": float(len(result["history"])),
         "global_step": float(trainer.global_step),
         "best_epoch": float(result["best_epoch"]),
@@ -67,28 +72,46 @@ def best_metrics(result: Dict[str, Any], trainer: Any) -> Dict[str, float]:
     return metrics
 
 
-def record_candidate_version(store: Any, session: Any, cfg: Config, prepared: PreparedDataset) -> Optional[Any]:
+def record_candidate_version(
+    store: Any, session: Any, cfg: Config, prepared: PreparedDataset
+) -> Any | None:
     from ored.learning.records import CheckpointKind
     from ored.learning.registry import record_version
 
-    bests = [c for c in store.checkpoints(CheckpointKind.BEST, run_name=cfg.run_name, logical=True)
-             if c.session_id == session.id]
+    bests = [
+        c
+        for c in store.checkpoints(
+            CheckpointKind.BEST, run_name=cfg.run_name, logical=True
+        )
+        if c.session_id == session.id
+    ]
     if not bests:
-        logger.info("model version : none recorded -- Supabase kept an earlier best, so this session "
-                    "produced no best checkpoint of its own")
+        logger.info(
+            "model version : none recorded -- Supabase kept an earlier best, so this session "
+            "produced no best checkpoint of its own"
+        )
         return None
     best = bests[-1]
     dataset = prepared.dataset
-    notes = (f"trained on {prepared.snapshot.tag}"
-             + (f" v{dataset.version}" if dataset is not None else "")
-             + f" (snapshot {prepared.snapshot.sha256[:16]}, {prepared.snapshot.record_count} records)")
-    version = record_version(store, f"{cfg.run_name}-{session.id[:8]}", session,
-                             f"{best.bucket_id}/{best.object_path}", notes)
-    logger.info(f"model version : {version.version} (candidate; promote it deliberately, never automatically)")
+    notes = (
+        f"trained on {prepared.snapshot.tag}"
+        + (f" v{dataset.version}" if dataset is not None else "")
+        + f" (snapshot {prepared.snapshot.sha256[:16]}, {prepared.snapshot.record_count} records)"
+    )
+    version = record_version(
+        store,
+        f"{cfg.run_name}-{session.id[:8]}",
+        session,
+        f"{best.bucket_id}/{best.object_path}",
+        notes,
+    )
+    logger.info(
+        f"model version : {version.version} (candidate; promote it deliberately, never automatically)"
+    )
     return version
 
 
-def run_supabase_training(cfg: Config) -> Dict[str, Any]:
+def run_supabase_training(cfg: Config) -> dict[str, Any]:
     from ored.learning import sessions
     from ored.training.trainer import Trainer
 
@@ -108,15 +131,21 @@ def run_supabase_training(cfg: Config) -> Dict[str, Any]:
             config=session_config(cfg, prepared),
             example_count=prepared.snapshot.record_count,
             conversation_count=0,
-            base_version=(f"{cfg.run_name}:live" if cfg.training.resume == "live"
-                          else cfg.training.resume) or None,
+            base_version=(
+                f"{cfg.run_name}:live"
+                if cfg.training.resume == "live"
+                else cfg.training.resume
+            )
+            or None,
             run_name=cfg.run_name,
             dataset_id=prepared.dataset.id if prepared.dataset is not None else None,
         )
         session = sessions.start(store, session)
         logger.info(f"session       : {session.id} (ored_training_sessions, running)")
     else:
-        logger.info("session       : not recorded -- Supabase is not configured on this machine")
+        logger.info(
+            "session       : not recorded -- Supabase is not configured on this machine"
+        )
 
     try:
         trainer = Trainer(cfg)
@@ -141,19 +170,29 @@ def run_supabase_training(cfg: Config) -> Dict[str, Any]:
         if cfg.checkpoint.upload:
             try:
                 version = record_candidate_version(store, session, cfg, prepared)
-                result["model_version"] = version.version if version is not None else None
+                result["model_version"] = (
+                    version.version if version is not None else None
+                )
             except (StoreError, PromotionError) as exc:
                 result["model_version"] = None
-                logger.error(f"model version : not recorded ({exc}); the session and checkpoints are recorded")
+                logger.error(
+                    f"model version : not recorded ({exc}); the session and checkpoints are recorded"
+                )
     return result
 
 
-def lineage_of_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+def lineage_of_payload(payload: dict[str, Any]) -> dict[str, Any]:
     dataset = dict((payload.get("extra") or {}).get("dataset") or {})
     data = (payload.get("config") or {}).get("data") or {}
     if not dataset and data.get("source") == "supabase":
-        dataset = {"source": "supabase", "dataset_tag": (data.get("supabase") or {}).get("dataset_tag"),
-                   "snapshot_sha256": (data.get("supabase") or {}).get("snapshot")}
+        dataset = {
+            "source": "supabase",
+            "dataset_tag": (data.get("supabase") or {}).get("dataset_tag"),
+            "snapshot_sha256": (data.get("supabase") or {}).get("snapshot"),
+        }
     if not dataset:
-        dataset = {"source": data.get("source") or "generated", "corpus_dir": (data.get("corpus") or {}).get("dir")}
+        dataset = {
+            "source": data.get("source") or "generated",
+            "corpus_dir": (data.get("corpus") or {}).get("dir"),
+        }
     return dataset

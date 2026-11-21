@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import ast
 import copy
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, get_type_hints
+from typing import Any, get_type_hints
 
 import yaml
 
 
 @dataclass
 class SplitConfig:
-
     train: float = 0.70
     val: float = 0.15
     test: float = 0.15
@@ -27,7 +27,6 @@ class SplitConfig:
 
 @dataclass
 class CorpusConfig:
-
     dir: str = "data/raw/corpus"
 
     sentence_lines: int = 12000
@@ -56,13 +55,12 @@ class CorpusConfig:
 
 @dataclass
 class SupabaseDataConfig:
-
     dataset_tag: str = ""
 
-    types: List[str] = field(default_factory=list)
-    categories: List[str] = field(default_factory=list)
-    subjects: List[str] = field(default_factory=list)
-    languages: List[str] = field(default_factory=list)
+    types: list[str] = field(default_factory=list)
+    categories: list[str] = field(default_factory=list)
+    subjects: list[str] = field(default_factory=list)
+    languages: list[str] = field(default_factory=list)
 
     include_unverified: bool = False
 
@@ -78,10 +76,16 @@ class SupabaseDataConfig:
 
     def validate(self) -> None:
         if self.on_invalid not in ("fail", "skip"):
-            raise ValueError("data.supabase.on_invalid must be fail (stop on a bad row) or skip")
-        if self.snapshot and not (12 <= len(self.snapshot) <= 64
-                                  and all(c in "0123456789abcdef" for c in self.snapshot)):
-            raise ValueError("data.supabase.snapshot must be a snapshot hash (at least 12 hex characters)")
+            raise ValueError(
+                "data.supabase.on_invalid must be fail (stop on a bad row) or skip"
+            )
+        if self.snapshot and not (
+            12 <= len(self.snapshot) <= 64
+            and all(c in "0123456789abcdef" for c in self.snapshot)
+        ):
+            raise ValueError(
+                "data.supabase.snapshot must be a snapshot hash (at least 12 hex characters)"
+            )
         for name in ("types", "categories", "subjects", "languages"):
             if not isinstance(getattr(self, name), list):
                 raise ValueError(f"data.supabase.{name} must be a list")
@@ -89,7 +93,6 @@ class SupabaseDataConfig:
 
 @dataclass
 class TokenDataConfig:
-
     manifest: str = ""
 
     dataset_name: str = ""
@@ -104,7 +107,9 @@ class TokenDataConfig:
 
     def validate(self) -> None:
         if self.verify not in ("full", "size"):
-            raise ValueError("data.tokens.verify must be full (sha256 every shard) or size")
+            raise ValueError(
+                "data.tokens.verify must be full (sha256 every shard) or size"
+            )
 
 
 DATA_SOURCES = ("generated", "supabase", "tokens")
@@ -142,8 +147,10 @@ class DataConfig:
         if self.source not in DATA_SOURCES:
             raise ValueError(f"data.source must be one of {', '.join(DATA_SOURCES)}")
         if self.source == "supabase" and not self.supabase.dataset_tag:
-            raise ValueError("data.source is supabase, so data.supabase.dataset_tag must name the "
-                             "dataset (a tag, or 'all' for every row)")
+            raise ValueError(
+                "data.source is supabase, so data.supabase.dataset_tag must name the "
+                "dataset (a tag, or 'all' for every row)"
+            )
         self.supabase.validate()
         self.tokens.validate()
         if self.num_workers < 0:
@@ -157,7 +164,9 @@ class DataConfig:
         if self.stride < 1:
             raise ValueError("data.stride must be >= 1")
         if self.tokenizer == "subword" and self.vocab_size < 256:
-            raise ValueError("data.vocab_size must be >= 256 for the subword tokenizer (one id per byte)")
+            raise ValueError(
+                "data.vocab_size must be >= 256 for the subword tokenizer (one id per byte)"
+            )
         self.split.validate()
         self.corpus.validate()
 
@@ -186,8 +195,10 @@ class ModelConfig:
         if not 0.0 <= self.dropout < 1.0:
             raise ValueError("model.dropout must be in [0, 1)")
         if self.attention not in ("manual", "sdpa"):
-            raise ValueError("model.attention must be manual (explicit T x T scores) or sdpa "
-                             "(torch scaled_dot_product_attention: flash / memory-efficient kernels)")
+            raise ValueError(
+                "model.attention must be manual (explicit T x T scores) or sdpa "
+                "(torch scaled_dot_product_attention: flash / memory-efficient kernels)"
+            )
         if self.expected_parameters < 0:
             raise ValueError("model.expected_parameters must be >= 0 (0 = not checked)")
 
@@ -244,13 +255,19 @@ class TrainingConfig:
         if self.grad_accum_steps < 1:
             raise ValueError("training.grad_accum_steps must be >= 1")
         if self.precision not in PRECISIONS:
-            raise ValueError(f"training.precision must be one of {', '.join(PRECISIONS)}")
+            raise ValueError(
+                f"training.precision must be one of {', '.join(PRECISIONS)}"
+            )
         if self.eval_every_epochs < 1:
             raise ValueError("training.eval_every_epochs must be >= 1")
         if self.eval_every_steps < 0 or self.eval_windows < 0:
-            raise ValueError("training.eval_every_steps and training.eval_windows must be >= 0 (0 = off)")
+            raise ValueError(
+                "training.eval_every_steps and training.eval_windows must be >= 0 (0 = off)"
+            )
         if self.eval_max_batches < 0:
-            raise ValueError("training.eval_max_batches must be >= 0 (0 = the whole split)")
+            raise ValueError(
+                "training.eval_max_batches must be >= 0 (0 = the whole split)"
+            )
         if self.log_every_steps < 1:
             raise ValueError("training.log_every_steps must be >= 1")
         if self.learning_rate <= 0:
@@ -269,7 +286,6 @@ class TrainingConfig:
 
 @dataclass
 class GenerationConfig:
-
     max_new_tokens: int = 300
 
     temperature: float = 0.8
@@ -296,7 +312,6 @@ CHECKPOINT_POLICIES = ("roles", "best_only")
 
 @dataclass
 class CheckpointConfig:
-
     best_metric: str = "val_loss"
     best_mode: str = "min"
 
@@ -320,18 +335,30 @@ class CheckpointConfig:
 
     def validate(self) -> None:
         if self.policy not in CHECKPOINT_POLICIES:
-            raise ValueError("checkpoint.policy must be roles (base/live/best/history) or best_only")
+            raise ValueError(
+                "checkpoint.policy must be roles (base/live/best/history) or best_only"
+            )
         if self.policy == "best_only" and self.keep_history:
-            raise ValueError("checkpoint.policy best_only keeps best.pt alone: keep_history must be false")
+            raise ValueError(
+                "checkpoint.policy best_only keeps best.pt alone: keep_history must be false"
+            )
         if self.best_mode not in ("min", "max"):
-            raise ValueError("checkpoint.best_mode must be 'min' (lower is better) or 'max'")
+            raise ValueError(
+                "checkpoint.best_mode must be 'min' (lower is better) or 'max'"
+            )
         if not self.best_metric:
             raise ValueError("checkpoint.best_metric must name a metric, e.g. val_loss")
-        for name in ("save_live_every_epochs", "save_live_every_steps",
-                     "save_history_every_epochs", "save_history_every_steps"):
+        for name in (
+            "save_live_every_epochs",
+            "save_live_every_steps",
+            "save_history_every_epochs",
+            "save_history_every_steps",
+        ):
             if getattr(self, name) < 0:
                 raise ValueError(f"checkpoint.{name} must be >= 0 (0 = off)")
-        if self.keep_history and not (self.save_history_every_epochs or self.save_history_every_steps):
+        if self.keep_history and not (
+            self.save_history_every_epochs or self.save_history_every_steps
+        ):
             raise ValueError(
                 "checkpoint.keep_history is on but no interval is set: set "
                 "save_history_every_epochs or save_history_every_steps"
@@ -340,7 +367,6 @@ class CheckpointConfig:
 
 @dataclass
 class DistributedConfig:
-
     enabled: bool = False
     backend: str = "gloo"
     nnodes: str = "1"
@@ -355,12 +381,16 @@ class DistributedConfig:
 
     def validate(self) -> None:
         if self.backend not in ("gloo", "nccl"):
-            raise ValueError("distributed.backend must be gloo (any OS, CPU or GPU) or nccl (Linux + NVIDIA GPUs)")
+            raise ValueError(
+                "distributed.backend must be gloo (any OS, CPU or GPU) or nccl (Linux + NVIDIA GPUs)"
+            )
         if self.rendezvous_backend not in ("c10d", "static"):
             raise ValueError("distributed.rendezvous_backend must be c10d or static")
         parts = str(self.nnodes).split(":")
         if len(parts) > 2 or not all(p.isdigit() and int(p) >= 1 for p in parts):
-            raise ValueError("distributed.nnodes must be a count like 3, or MIN:MAX like 2:5")
+            raise ValueError(
+                "distributed.nnodes must be a count like 3, or MIN:MAX like 2:5"
+            )
         if len(parts) == 2 and int(parts[0]) > int(parts[1]):
             raise ValueError("distributed.nnodes MIN:MAX needs MIN <= MAX")
         if self.nproc_per_node < 1:
@@ -382,7 +412,6 @@ class PathsConfig:
 
 @dataclass
 class Config:
-
     run_name: str = "ored"
 
     task: str = "language_model"
@@ -397,17 +426,23 @@ class Config:
     distributed: DistributedConfig = field(default_factory=DistributedConfig)
     paths: PathsConfig = field(default_factory=PathsConfig)
 
-    def validate(self) -> "Config":
+    def validate(self) -> Config:
         if self.task != "language_model":
             raise ValueError(f"task must be language_model, got {self.task!r}")
         if self.checkpoint.policy == "best_only" and self.data.source != "tokens":
-            raise ValueError(f"this config (checkpoint.policy: best_only, e.g. ored50m) trains only on token "
-                             f"shards from R2 (data.source: tokens), not on data.source: {self.data.source}")
+            raise ValueError(
+                f"this config (checkpoint.policy: best_only, e.g. ored50m) trains only on token "
+                f"shards from R2 (data.source: tokens), not on data.source: {self.data.source}"
+            )
         if self.data.source == "tokens" and self.checkpoint.policy != "best_only":
-            raise ValueError("data.source: tokens trains with the best-only pretraining loop: "
-                             "set checkpoint.policy: best_only")
+            raise ValueError(
+                "data.source: tokens trains with the best-only pretraining loop: "
+                "set checkpoint.policy: best_only"
+            )
         if self.data.source == "tokens" and self.distributed.enabled:
-            raise ValueError("data.source: tokens is single-GPU for now; distributed.enabled must be false")
+            raise ValueError(
+                "data.source: tokens is single-GPU for now; distributed.enabled must be false"
+            )
         self.data.validate()
         self.model.validate()
         self.training.validate()
@@ -416,7 +451,7 @@ class Config:
         self.distributed.validate()
         return self
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @property
@@ -424,11 +459,13 @@ class Config:
         return Path(self.paths.checkpoint_dir) / self.run_name
 
 
-def _from_dict(cls: type, data: Dict[str, Any], path: str = "") -> Any:
+def _from_dict(cls: type, data: dict[str, Any], path: str = "") -> Any:
     if not is_dataclass(cls):
         return data
     if not isinstance(data, dict):
-        raise TypeError(f"expected a mapping at '{path or 'root'}', got {type(data).__name__}")
+        raise TypeError(
+            f"expected a mapping at '{path or 'root'}', got {type(data).__name__}"
+        )
 
     known = {f.name: f for f in fields(cls)}
     unknown = set(data) - set(known)
@@ -441,7 +478,7 @@ def _from_dict(cls: type, data: Dict[str, Any], path: str = "") -> Any:
 
     hints = get_type_hints(cls)
 
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     for name in known:
         if name not in data:
             continue
@@ -480,7 +517,9 @@ def _apply_override(cfg: Config, assignment: str) -> None:
     target: Any = cfg
     for part in parts[:-1]:
         if not hasattr(target, part):
-            raise ValueError(f"unknown config section '{part}' in override {assignment!r}")
+            raise ValueError(
+                f"unknown config section '{part}' in override {assignment!r}"
+            )
         target = getattr(target, part)
 
     leaf = parts[-1]
@@ -509,10 +548,14 @@ def load_config(
     return cfg.validate()
 
 
-RETIRED_KEYS = {"data": ("n_bits", "raw_path"), "model": ("hidden_sizes", "activation"), "training": ("loss",)}
+RETIRED_KEYS = {
+    "data": ("n_bits", "raw_path"),
+    "model": ("hidden_sizes", "activation"),
+    "training": ("loss",),
+}
 
 
-def config_from_dict(data: Dict[str, Any]) -> Config:
+def config_from_dict(data: dict[str, Any]) -> Config:
     data = copy.deepcopy(data)
     if str((data.get("model") or {}).get("name", "")).lower() == "transformer":
         data["task"] = "language_model"

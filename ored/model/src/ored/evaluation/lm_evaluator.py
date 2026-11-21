@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import torch
 
@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 def load_language_model(
     checkpoint_path: str | Path,
     device: str = "auto",
-) -> Tuple[torch.nn.Module, Tokenizer, Config, Dict[str, Any]]:
+) -> tuple[torch.nn.Module, Tokenizer, Config, dict[str, Any]]:
     resolved = resolve_device(device)
     payload = load_for_inference(checkpoint_path, map_location=resolved)
     cfg = config_from_dict(payload["config"])
@@ -54,19 +54,25 @@ def load_language_model(
 
 
 @torch.no_grad()
-def measure_token_shards(model, cfg: Config, device: torch.device,
-                         tokenizer_info: Dict[str, Any]) -> Dict[str, float]:
+def measure_token_shards(
+    model, cfg: Config, device: torch.device, tokenizer_info: dict[str, Any]
+) -> dict[str, float]:
     from ored.data.token_shards import TokenWindowDataset, load_manifest, verify_shards
     from ored.training.pretrain import _dataset_directory, validation_sample
 
     directory = _dataset_directory(cfg, tokenizer_info)
     manifest = load_manifest(directory)
     if manifest["tokenizer"]["sha256"] != tokenizer_info["sha256"]:
-        raise ValueError(f"{directory} was tokenized with a different tokenizer than this checkpoint")
+        raise ValueError(
+            f"{directory} was tokenized with a different tokenizer than this checkpoint"
+        )
     verify_shards(directory, manifest, cfg.data.tokens.verify, splits=("val",))
     block = cfg.data.block_size
-    windows = validation_sample(TokenWindowDataset(directory, manifest, "val", block, block),
-                                cfg.training.eval_windows, cfg.seed)
+    windows = validation_sample(
+        TokenWindowDataset(directory, manifest, "val", block, block),
+        cfg.training.eval_windows,
+        cfg.seed,
+    )
     total_loss = 0.0
     total_tokens = 0
     for start in range(0, len(windows), 32):
@@ -75,15 +81,29 @@ def measure_token_shards(model, cfg: Config, device: torch.device,
         targets = torch.stack([c[1] for c in chunk]).to(device)
         logits = model(ids)
         total_loss += torch.nn.functional.cross_entropy(
-            logits.reshape(-1, logits.size(-1)).float(), targets.reshape(-1), reduction="sum").item()
+            logits.reshape(-1, logits.size(-1)).float(),
+            targets.reshape(-1),
+            reduction="sum",
+        ).item()
         total_tokens += targets.numel()
     mean_loss = total_loss / max(total_tokens, 1)
-    return {"windows": float(len(windows)), "tokens": float(total_tokens), "loss": mean_loss,
-            "perplexity": math.exp(min(mean_loss, 20.0))}
+    return {
+        "windows": float(len(windows)),
+        "tokens": float(total_tokens),
+        "loss": mean_loss,
+        "perplexity": math.exp(min(mean_loss, 20.0)),
+    }
 
 
-def evaluate_token_model(model, tokenizer: Tokenizer, cfg: Config, info: Dict[str, Any],
-                         n_samples: int, sample_tokens: int, temperature: float) -> Dict[str, Any]:
+def evaluate_token_model(
+    model,
+    tokenizer: Tokenizer,
+    cfg: Config,
+    info: dict[str, Any],
+    n_samples: int,
+    sample_tokens: int,
+    temperature: float,
+) -> dict[str, Any]:
     resolved = info["device"]
     try:
         val = measure_token_shards(model, cfg, resolved, info["tokenizer_info"])
@@ -91,15 +111,24 @@ def evaluate_token_model(model, tokenizer: Tokenizer, cfg: Config, info: Dict[st
         val = None
         logger.info(f"validation skipped: the token shards could not be read ({exc})")
     if val is not None:
-        logger.info(f"val windows : {int(val['windows']):,} ({int(val['tokens']):,} tokens)")
+        logger.info(
+            f"val windows : {int(val['windows']):,} ({int(val['tokens']):,} tokens)"
+        )
         logger.info(f"val loss    : {val['loss']:.4f}")
         logger.info(f"perplexity  : {val['perplexity']:.3f}")
 
     logger.info(section("GENERATED TEXT"))
-    samples: List[str] = []
+    samples: list[str] = []
     for _ in range(n_samples):
-        text = generate_text(model=model, tokenizer=tokenizer, prompt="", max_new_tokens=sample_tokens,
-                             block_size=cfg.data.block_size, device=resolved, temperature=temperature)
+        text = generate_text(
+            model=model,
+            tokenizer=tokenizer,
+            prompt="",
+            max_new_tokens=sample_tokens,
+            block_size=cfg.data.block_size,
+            device=resolved,
+            temperature=temperature,
+        )
         samples.append(text)
         for line in text.strip().split("\n")[:14]:
             logger.info(f"  {line}")
@@ -108,11 +137,12 @@ def evaluate_token_model(model, tokenizer: Tokenizer, cfg: Config, info: Dict[st
 
 
 @torch.no_grad()
-def measure_splits(model, cfg: Config, device: torch.device,
-                   splits: List[str]) -> Dict[str, Dict[str, float]]:
+def measure_splits(
+    model, cfg: Config, device: torch.device, splits: list[str]
+) -> dict[str, dict[str, float]]:
     datasets, _ = build_text_datasets(cfg)
 
-    results: Dict[str, Dict[str, float]] = {}
+    results: dict[str, dict[str, float]] = {}
     for split in splits:
         dataset = datasets[split]
         total_loss = 0.0
@@ -142,8 +172,12 @@ def measure_splits(model, cfg: Config, device: torch.device,
 
 
 def evaluate_arithmetic(
-    model, tokenizer: Tokenizer, cfg: Config, device: torch.device,
-    split: str = "test", limit: int = 0,
+    model,
+    tokenizer: Tokenizer,
+    cfg: Config,
+    device: torch.device,
+    split: str = "test",
+    limit: int = 0,
 ):
     pairs = load_arithmetic_pairs(cfg.data.corpus.dir)[split]
     if limit:
@@ -152,22 +186,23 @@ def evaluate_arithmetic(
     completions = []
     for a, b in pairs:
         prompt = f"{a} + {b} = "
-        written = complete(model, tokenizer, prompt, cfg.data.block_size, device,
-                           max_new_tokens=6)
+        written = complete(
+            model, tokenizer, prompt, cfg.data.block_size, device, max_new_tokens=6
+        )
         completions.append((a, b, written))
     return score_arithmetic(completions, reverse_answer=cfg.data.corpus.reverse_answer)
 
 
 def evaluate_language_model(
     checkpoint_path: str | Path,
-    splits: Optional[List[str]] = None,
+    splits: list[str] | None = None,
     device: str = "auto",
     n_samples: int = 3,
     sample_tokens: int = 400,
     temperature: float = 0.8,
     arithmetic_limit: int = 0,
     seed: int = 1234,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     splits = splits or ["train", "val", "test"]
     model, tokenizer, cfg, info = load_language_model(checkpoint_path, device)
     resolved = info["device"]
@@ -181,28 +216,38 @@ def evaluate_language_model(
     logger.info("")
 
     if cfg.data.source == "tokens":
-        return evaluate_token_model(model, tokenizer, cfg, info, n_samples, sample_tokens, temperature)
+        return evaluate_token_model(
+            model, tokenizer, cfg, info, n_samples, sample_tokens, temperature
+        )
 
     split_results = measure_splits(model, cfg, resolved, splits)
-    header = f"{'split':<8}{'tokens':>12}{'loss':>10}{'bits/char':>12}{'perplexity':>13}"
+    header = (
+        f"{'split':<8}{'tokens':>12}{'loss':>10}{'bits/char':>12}{'perplexity':>13}"
+    )
     logger.info(header)
     logger.info("-" * len(header))
     for split in splits:
         r = split_results[split]
-        logger.info(f"{split:<8}{int(r['tokens']):>12,}{r['loss']:>10.4f}"
-                    f"{r['bpc']:>12.4f}{r['perplexity']:>13.3f}")
+        logger.info(
+            f"{split:<8}{int(r['tokens']):>12,}{r['loss']:>10.4f}"
+            f"{r['bpc']:>12.4f}{r['perplexity']:>13.3f}"
+        )
     logger.info("")
     logger.info("bits/char = how many yes/no questions are needed, on average, to")
     logger.info("            identify each character of the text. Lower is better.")
 
     grammar = load_grammar(cfg.data.corpus.dir)
     logger.info(section("GENERATED TEXT"))
-    samples: List[str] = []
+    samples: list[str] = []
     for index in range(n_samples):
         text = generate_text(
-            model=model, tokenizer=tokenizer, prompt="",
-            max_new_tokens=sample_tokens, block_size=cfg.data.block_size,
-            device=resolved, temperature=temperature,
+            model=model,
+            tokenizer=tokenizer,
+            prompt="",
+            max_new_tokens=sample_tokens,
+            block_size=cfg.data.block_size,
+            device=resolved,
+            temperature=temperature,
         )
         samples.append(text)
         if index == 0:
@@ -211,13 +256,16 @@ def evaluate_language_model(
             for line in text.strip().split("\n")[:14]:
                 logger.info(f"  {line}")
 
-    quality = score_text("\n".join(samples), grammar,
-                         reverse_answer=cfg.data.corpus.reverse_answer)
+    quality = score_text(
+        "\n".join(samples), grammar, reverse_answer=cfg.data.corpus.reverse_answer
+    )
     logger.info("")
     logger.info(f"lines generated   : {quality.total_lines}")
     logger.info(f"valid sentences   : {quality.grammatical_lines}")
-    logger.info(f"valid sums written: {quality.arithmetic_lines} "
-                f"({quality.arithmetic_correct} arithmetically correct)")
+    logger.info(
+        f"valid sums written: {quality.arithmetic_lines} "
+        f"({quality.arithmetic_correct} arithmetically correct)"
+    )
     logger.info(f"malformed lines   : {quality.malformed_lines}")
     logger.info(f"WELL-FORMED RATE  : {quality.well_formed_rate:.1%}")
     if quality.examples_bad:
@@ -232,18 +280,24 @@ def evaluate_language_model(
         logger.info("correct. Answers are un-reversed before they are scored.")
         logger.info("")
 
-    seen = evaluate_arithmetic(model, tokenizer, cfg, resolved,
-                               split="train", limit=arithmetic_limit)
-    arithmetic = evaluate_arithmetic(model, tokenizer, cfg, resolved,
-                                     split="test", limit=arithmetic_limit)
+    seen = evaluate_arithmetic(
+        model, tokenizer, cfg, resolved, split="train", limit=arithmetic_limit
+    )
+    arithmetic = evaluate_arithmetic(
+        model, tokenizer, cfg, resolved, split="test", limit=arithmetic_limit
+    )
 
     header = f"{'pairs':<22}{'tested':>9}{'correct':>10}{'accuracy':>11}"
     logger.info(header)
     logger.info("-" * len(header))
-    logger.info(f"{'train (seen ' + str(cfg.data.corpus.arithmetic_repeats) + 'x)':<22}"
-                f"{seen.total:>9,}{seen.correct:>10,}{seen.accuracy:>11.1%}")
-    logger.info(f"{'test (held out)':<22}"
-                f"{arithmetic.total:>9,}{arithmetic.correct:>10,}{arithmetic.accuracy:>11.1%}")
+    logger.info(
+        f"{'train (seen ' + str(cfg.data.corpus.arithmetic_repeats) + 'x)':<22}"
+        f"{seen.total:>9,}{seen.correct:>10,}{seen.accuracy:>11.1%}"
+    )
+    logger.info(
+        f"{'test (held out)':<22}"
+        f"{arithmetic.total:>9,}{arithmetic.correct:>10,}{arithmetic.accuracy:>11.1%}"
+    )
     logger.info("")
     logger.info("Held-out pairs were excluded from the training corpus: the model has")
     logger.info("never read the line it is being asked to complete. The train row is")

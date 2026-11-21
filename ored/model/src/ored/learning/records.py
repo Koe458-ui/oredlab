@@ -4,7 +4,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 def new_id() -> str:
@@ -67,9 +67,8 @@ class CheckpointKind(str, Enum):
 
 @dataclass
 class Conversation:
-
     id: str = field(default_factory=new_id)
-    user_id: Optional[str] = None
+    user_id: str | None = None
     visitor: str = ""
     title: str = ""
     created_at: str = field(default_factory=now)
@@ -83,18 +82,16 @@ class Conversation:
 
 @dataclass
 class Message:
-
     id: str = field(default_factory=new_id)
     conversation_id: str = ""
     role: Role = Role.USER
     content: str = ""
-    model_version: Optional[str] = None
+    model_version: str | None = None
     created_at: str = field(default_factory=now)
 
 
 @dataclass
 class LearningCandidate:
-
     id: str = field(default_factory=new_id)
     conversation_id: str = ""
     prompt: str = ""
@@ -103,86 +100,82 @@ class LearningCandidate:
     source: str = "conversation"
     fingerprint: str = ""
     redacted: bool = False
-    quality: Optional[float] = None
-    reviewed_by: Optional[str] = None
-    reviewed_at: Optional[str] = None
+    quality: float | None = None
+    reviewed_by: str | None = None
+    reviewed_at: str | None = None
     review_note: str = ""
     created_at: str = field(default_factory=now)
 
 
 @dataclass
 class TrainingExample:
-
     id: str = field(default_factory=new_id)
     candidate_id: str = ""
     dataset_tag: str = ""
     prompt: str = ""
     response: str = ""
-    approved_by: Optional[str] = None
+    approved_by: str | None = None
     created_at: str = field(default_factory=now)
 
 
 @dataclass
 class Dataset:
-
     id: str = field(default_factory=new_id)
     name: str = ""
     kind: str = "text"
     summary: str = ""
     generator: str = ""
-    spec: Dict[str, Any] = field(default_factory=dict)
-    samples: List[Dict[str, Any]] = field(default_factory=list)
+    spec: dict[str, Any] = field(default_factory=dict)
+    samples: list[dict[str, Any]] = field(default_factory=list)
     version: int = 1
     created_at: str = field(default_factory=now)
     updated_at: str = field(default_factory=now)
     source: str = "generated"
-    sha256: Optional[str] = None
+    sha256: str | None = None
     record_count: int = 0
-    selection: Dict[str, Any] = field(default_factory=dict)
-    split_counts: Dict[str, int] = field(default_factory=dict)
-    storage_path: Optional[str] = None
+    selection: dict[str, Any] = field(default_factory=dict)
+    split_counts: dict[str, int] = field(default_factory=dict)
+    storage_path: str | None = None
 
 
 @dataclass
 class TrainingData:
-
     id: str = field(default_factory=new_id)
     type: str = ""
     category: str = ""
-    subject: Optional[str] = None
-    topic: Optional[str] = None
+    subject: str | None = None
+    topic: str | None = None
     input: str = ""
     output: str = ""
-    difficulty: Optional[str] = None
+    difficulty: str | None = None
     language: str = "en"
     source: str = "manual"
-    dataset_tag: Optional[str] = None
+    dataset_tag: str | None = None
     enabled: bool = True
     verified: bool = False
     fingerprint: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=now)
     updated_at: str = field(default_factory=now)
 
 
 @dataclass
 class TrainingSession:
-
     id: str = field(default_factory=new_id)
     dataset_tag: str = ""
-    base_version: Optional[str] = None
+    base_version: str | None = None
     status: SessionStatus = SessionStatus.QUEUED
-    config: Dict[str, Any] = field(default_factory=dict)
-    metrics: Dict[str, float] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
+    metrics: dict[str, float] = field(default_factory=dict)
     example_count: int = 0
     conversation_count: int = 0
     error: str = ""
-    started_at: Optional[str] = None
-    finished_at: Optional[str] = None
+    started_at: str | None = None
+    finished_at: str | None = None
     created_at: str = field(default_factory=now)
-    session_key: Optional[str] = None
+    session_key: str | None = None
     run_name: str = ""
-    dataset_id: Optional[str] = None
+    dataset_id: str | None = None
 
     def __post_init__(self) -> None:
         self.status = SessionStatus(self.status)
@@ -190,13 +183,12 @@ class TrainingSession:
 
 @dataclass
 class TrainingWorker:
-
     id: str = field(default_factory=new_id)
     session_id: str = ""
     worker_id: str = ""
-    rank: Optional[int] = None
-    node_rank: Optional[int] = None
-    local_rank: Optional[int] = None
+    rank: int | None = None
+    node_rank: int | None = None
+    local_rank: int | None = None
     hostname: str = ""
     device: str = ""
     gpu_name: str = ""
@@ -204,7 +196,7 @@ class TrainingWorker:
     status: WorkerStatus = WorkerStatus.JOINING
     last_heartbeat: str = field(default_factory=now)
     started_at: str = field(default_factory=now)
-    finished_at: Optional[str] = None
+    finished_at: str | None = None
     error: str = ""
     created_at: str = field(default_factory=now)
 
@@ -214,15 +206,14 @@ class TrainingWorker:
 
 @dataclass
 class ModelVersion:
-
     id: str = field(default_factory=new_id)
     version: str = ""
     status: VersionStatus = VersionStatus.CANDIDATE
-    session_id: Optional[str] = None
+    session_id: str | None = None
     checkpoint_path: str = ""
-    metrics: Dict[str, float] = field(default_factory=dict)
+    metrics: dict[str, float] = field(default_factory=dict)
     notes: str = ""
-    promoted_at: Optional[str] = None
+    promoted_at: str | None = None
     created_at: str = field(default_factory=now)
 
     def __post_init__(self) -> None:
@@ -231,10 +222,9 @@ class ModelVersion:
 
 @dataclass
 class Checkpoint:
-
     id: str = field(default_factory=new_id)
-    version_id: Optional[str] = None
-    session_id: Optional[str] = None
+    version_id: str | None = None
+    session_id: str | None = None
     kind: CheckpointKind = CheckpointKind.BEST
     run_name: str = ""
     bucket_id: str = "ored-checkpoints"
@@ -244,18 +234,18 @@ class Checkpoint:
     format_version: int = 1
     torch_version: str = ""
     epoch: int = 0
-    metrics: Dict[str, float] = field(default_factory=dict)
-    uploaded_by: Optional[str] = None
+    metrics: dict[str, float] = field(default_factory=dict)
+    uploaded_by: str | None = None
     created_at: str = field(default_factory=now)
     global_step: int = 0
     is_current: bool = False
-    parent_checkpoint_id: Optional[str] = None
-    promotion_metric: Optional[str] = None
-    promotion_mode: Optional[str] = None
-    verified_at: Optional[str] = None
+    parent_checkpoint_id: str | None = None
+    promotion_metric: str | None = None
+    promotion_mode: str | None = None
+    verified_at: str | None = None
     part: CheckpointPart = CheckpointPart.FILE
-    checkpoint_group_id: Optional[str] = None
-    rank: Optional[int] = None
+    checkpoint_group_id: str | None = None
+    rank: int | None = None
     world_size: int = 1
     is_complete: bool = True
     upload_status: str = "verified"
@@ -283,7 +273,7 @@ RECORD_TABLES = {
 }
 
 
-def to_row(record: Any) -> Dict[str, Any]:
+def to_row(record: Any) -> dict[str, Any]:
     row = asdict(record)
     for key, value in row.items():
         if isinstance(value, Enum):

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 import torch
-
 from ored.data.tokenizer import CharTokenizer
 from ored.inference.generator import complete, generate_text, generate_tokens
 from ored.models.transformer import Transformer
@@ -12,8 +11,15 @@ from ored.models.transformer import Transformer
 def setup():
     torch.manual_seed(0)
     tokenizer = CharTokenizer.from_text("the cat sees 0123456789 + = .\n")
-    model = Transformer(vocab_size=tokenizer.vocab_size, block_size=16, d_model=32,
-                        n_layer=2, n_head=2, d_ff=64, dropout=0.0)
+    model = Transformer(
+        vocab_size=tokenizer.vocab_size,
+        block_size=16,
+        d_model=32,
+        n_layer=2,
+        n_head=2,
+        d_ff=64,
+        dropout=0.0,
+    )
     model.eval()
     return model, tokenizer
 
@@ -80,24 +86,37 @@ def test_stop_token_ends_generation_early(setup):
     model, tokenizer = setup
     newline = tokenizer.encode("\n")
     ids = torch.tensor([tokenizer.encode("the ")])
-    out = generate_tokens(model, ids, max_new_tokens=200, block_size=16,
-                          greedy=True, stop_ids=newline)
+    out = generate_tokens(
+        model, ids, max_new_tokens=200, block_size=16, greedy=True, stop_ids=newline
+    )
     if out.shape[1] < ids.shape[1] + 200:
         assert int(out[0, -1]) == newline[0]
 
 
 def test_generated_text_starts_with_the_prompt(setup):
     model, tokenizer = setup
-    text = generate_text(model, tokenizer, "the cat", max_new_tokens=10,
-                         block_size=16, device=torch.device("cpu"))
+    text = generate_text(
+        model,
+        tokenizer,
+        "the cat",
+        max_new_tokens=10,
+        block_size=16,
+        device=torch.device("cpu"),
+    )
     assert text.startswith("the cat")
 
 
 def test_complete_returns_only_the_continuation(setup):
     model, tokenizer = setup
     prompt = "3 + 4 = "
-    written = complete(model, tokenizer, prompt, block_size=16,
-                       device=torch.device("cpu"), max_new_tokens=5)
+    written = complete(
+        model,
+        tokenizer,
+        prompt,
+        block_size=16,
+        device=torch.device("cpu"),
+        max_new_tokens=5,
+    )
     assert not written.startswith(prompt)
     assert "\n" not in written
 
@@ -112,5 +131,6 @@ def test_invalid_temperature_is_rejected(setup):
 def test_batched_input_is_rejected(setup):
     model, tokenizer = setup
     with pytest.raises(ValueError, match="shape"):
-        generate_tokens(model, torch.zeros(2, 4, dtype=torch.long),
-                        max_new_tokens=5, block_size=16)
+        generate_tokens(
+            model, torch.zeros(2, 4, dtype=torch.long), max_new_tokens=5, block_size=16
+        )

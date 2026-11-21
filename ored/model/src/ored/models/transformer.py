@@ -1,29 +1,37 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Optional
+from typing import Any
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.utils.checkpoint import checkpoint
 
 from ored.models.base import OredModel
 from ored.models.registry import register_model
 
-
 ATTENTION_IMPLEMENTATIONS = ("manual", "sdpa")
 
 
 class CausalSelfAttention(nn.Module):
-
-    def __init__(self, d_model: int, n_head: int, block_size: int, dropout: float = 0.0,
-                 attention: str = "manual") -> None:
+    def __init__(
+        self,
+        d_model: int,
+        n_head: int,
+        block_size: int,
+        dropout: float = 0.0,
+        attention: str = "manual",
+    ) -> None:
         super().__init__()
         if d_model % n_head != 0:
-            raise ValueError(f"d_model ({d_model}) must be divisible by n_head ({n_head})")
+            raise ValueError(
+                f"d_model ({d_model}) must be divisible by n_head ({n_head})"
+            )
         if attention not in ATTENTION_IMPLEMENTATIONS:
-            raise ValueError(f"attention must be one of {ATTENTION_IMPLEMENTATIONS}, got {attention!r}")
+            raise ValueError(
+                f"attention must be one of {ATTENTION_IMPLEMENTATIONS}, got {attention!r}"
+            )
         self.attention = attention
         self.dropout = dropout
 
@@ -41,7 +49,9 @@ class CausalSelfAttention(nn.Module):
         if attention == "manual":
             self.register_buffer(
                 "causal_mask",
-                torch.tril(torch.ones(block_size, block_size)).view(1, 1, block_size, block_size),
+                torch.tril(torch.ones(block_size, block_size)).view(
+                    1, 1, block_size, block_size
+                ),
                 persistent=False,
             )
 
@@ -56,7 +66,12 @@ class CausalSelfAttention(nn.Module):
 
         if self.attention == "sdpa":
             out = F.scaled_dot_product_attention(
-                q, k, v, dropout_p=self.dropout if self.training else 0.0, is_causal=True)
+                q,
+                k,
+                v,
+                dropout_p=self.dropout if self.training else 0.0,
+                is_causal=True,
+            )
             out = out.transpose(1, 2).contiguous().view(B, T, C)
             return self.residual_dropout(self.projection(out))
 
@@ -75,7 +90,6 @@ class CausalSelfAttention(nn.Module):
 
 
 class FeedForward(nn.Module):
-
     def __init__(self, d_model: int, d_ff: int, dropout: float = 0.0) -> None:
         super().__init__()
         self.net = nn.Sequential(
@@ -90,12 +104,20 @@ class FeedForward(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-
-    def __init__(self, d_model: int, n_head: int, d_ff: int, block_size: int,
-                 dropout: float = 0.0, attention: str = "manual") -> None:
+    def __init__(
+        self,
+        d_model: int,
+        n_head: int,
+        d_ff: int,
+        block_size: int,
+        dropout: float = 0.0,
+        attention: str = "manual",
+    ) -> None:
         super().__init__()
         self.ln_1 = nn.LayerNorm(d_model)
-        self.attention = CausalSelfAttention(d_model, n_head, block_size, dropout, attention)
+        self.attention = CausalSelfAttention(
+            d_model, n_head, block_size, dropout, attention
+        )
         self.ln_2 = nn.LayerNorm(d_model)
         self.feed_forward = FeedForward(d_model, d_ff, dropout)
 
@@ -107,7 +129,6 @@ class TransformerBlock(nn.Module):
 
 @register_model("transformer")
 class Transformer(OredModel):
-
     def __init__(
         self,
         vocab_size: int,
@@ -137,10 +158,12 @@ class Transformer(OredModel):
         self.position_embedding = nn.Embedding(block_size, d_model)
 
         self.dropout = nn.Dropout(dropout)
-        self.blocks = nn.ModuleList([
-            TransformerBlock(d_model, n_head, d_ff, block_size, dropout, attention)
-            for _ in range(n_layer)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                TransformerBlock(d_model, n_head, d_ff, block_size, dropout, attention)
+                for _ in range(n_layer)
+            ]
+        )
         self.ln_final = nn.LayerNorm(d_model)
 
         self.head = nn.Linear(d_model, vocab_size, bias=False)
@@ -163,7 +186,9 @@ class Transformer(OredModel):
 
     def forward(self, ids: torch.Tensor) -> torch.Tensor:
         if ids.dim() != 2:
-            raise ValueError(f"expected ids of shape (batch, seq), got {tuple(ids.shape)}")
+            raise ValueError(
+                f"expected ids of shape (batch, seq), got {tuple(ids.shape)}"
+            )
         B, T = ids.shape
         if T > self.block_size:
             raise ValueError(
@@ -177,7 +202,11 @@ class Transformer(OredModel):
         x = self.dropout(x)
 
         for block in self.blocks:
-            if self.gradient_checkpointing and self.training and torch.is_grad_enabled():
+            if (
+                self.gradient_checkpointing
+                and self.training
+                and torch.is_grad_enabled()
+            ):
                 x = checkpoint(block, x, use_reentrant=False)
             else:
                 x = block(x)
@@ -186,9 +215,11 @@ class Transformer(OredModel):
         return self.head(x)
 
     @classmethod
-    def from_config(cls, cfg, vocab_size: Optional[int] = None, **_: Any) -> "Transformer":
+    def from_config(cls, cfg, vocab_size: int | None = None, **_: Any) -> Transformer:
         if vocab_size is None:
-            raise ValueError("Transformer needs vocab_size, which comes from the tokenizer")
+            raise ValueError(
+                "Transformer needs vocab_size, which comes from the tokenizer"
+            )
         return cls(
             vocab_size=vocab_size,
             block_size=cfg.data.block_size,
@@ -206,7 +237,7 @@ class Transformer(OredModel):
     def embeddings_tied(self) -> bool:
         return self.head.weight is self.token_embedding.weight
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         return {
             "type": "Transformer",
             "vocab_size": self.vocab_size,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from ored.data.tokenizer import CharTokenizer
 from ored.inference.vocab_cli import corpus_words, inspect, tokenizer_from_checkpoint
 from ored.inference.vocab_cli import main as vocab_main
@@ -81,11 +80,17 @@ def test_the_tokenizer_is_read_back_from_a_checkpoint(trained_lm_checkpoint):
 
 
 def test_the_cli_reports_on_each_message(trained_lm_checkpoint, tmp_path):
-    exit_code = vocab_main([
-        "--checkpoint", str(trained_lm_checkpoint),
-        "--text", "3 + 4 = 7",
-        "--text", "WHAT IS A HUMAN?",
-        "--corpus", str(tmp_path),
-    ])
+    exit_code = vocab_main(
+        [
+            "--checkpoint",
+            str(trained_lm_checkpoint),
+            "--text",
+            "3 + 4 = 7",
+            "--text",
+            "WHAT IS A HUMAN?",
+            "--corpus",
+            str(tmp_path),
+        ]
+    )
 
     assert exit_code == 0

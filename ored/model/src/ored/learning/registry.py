@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+
 
 from ored.learning.records import (
     ModelVersion,
@@ -19,7 +19,6 @@ class PromotionError(RuntimeError):
 
 @dataclass
 class PromotionPolicy:
-
     metric: str = "val_loss"
     lower_is_better: bool = True
     min_improvement: float = 0.0
@@ -52,7 +51,7 @@ def record_version(
     )
 
 
-def production(store: LearningStore) -> Optional[ModelVersion]:
+def production(store: LearningStore) -> ModelVersion | None:
     live = store.versions(VersionStatus.PRODUCTION)
     return live[-1] if live else None
 
@@ -61,13 +60,15 @@ def check_promotable(
     store: LearningStore,
     version: ModelVersion,
     session: TrainingSession,
-    policy: Optional[PromotionPolicy] = None,
-) -> List[str]:
+    policy: PromotionPolicy | None = None,
+) -> list[str]:
     policy = policy or PromotionPolicy()
-    blockers: List[str] = []
+    blockers: list[str] = []
 
     if version.status is not VersionStatus.CANDIDATE:
-        blockers.append(f"version {version.version} is {version.status.value}, not a candidate")
+        blockers.append(
+            f"version {version.version} is {version.status.value}, not a candidate"
+        )
     if session.status is not SessionStatus.EVALUATED:
         blockers.append("the training session behind it has not been evaluated")
     if session.example_count < policy.min_examples:
@@ -99,7 +100,7 @@ def promote(
     store: LearningStore,
     version: ModelVersion,
     session: TrainingSession,
-    policy: Optional[PromotionPolicy] = None,
+    policy: PromotionPolicy | None = None,
 ) -> ModelVersion:
     blockers = check_promotable(store, version, session, policy)
     if blockers:
@@ -115,7 +116,7 @@ def promote(
     return store.update_version(version)
 
 
-def history(store: LearningStore) -> Dict[str, List[ModelVersion]]:
+def history(store: LearningStore) -> dict[str, list[ModelVersion]]:
     return {
         "candidate": store.versions(VersionStatus.CANDIDATE),
         "production": store.versions(VersionStatus.PRODUCTION),

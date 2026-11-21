@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+
 
 from ored.data.facts import TERMINATORS
 from ored.inference.predictor import LanguageModelPredictor, load_predictor
@@ -22,7 +23,6 @@ class RecallError(RuntimeError):
 
 @dataclass
 class Miss:
-
     question: str
     expected: str
     written: str
@@ -31,11 +31,10 @@ class Miss:
 
 @dataclass
 class RecallReport:
-
     asked: int = 0
     right: int = 0
-    misses: List[Miss] = field(default_factory=list)
-    by_category: Dict[str, List[int]] = field(default_factory=dict)
+    misses: list[Miss] = field(default_factory=list)
+    by_category: dict[str, list[int]] = field(default_factory=dict)
 
     @property
     def score(self) -> float:
@@ -53,7 +52,7 @@ class RecallReport:
         return "\n".join(lines)
 
 
-def read_facts(directory: str | Path) -> List[Dict[str, str]]:
+def read_facts(directory: str | Path) -> list[dict[str, str]]:
     path = Path(directory) / "facts.json"
     if not path.exists():
         raise RecallError(
@@ -63,7 +62,7 @@ def read_facts(directory: str | Path) -> List[Dict[str, str]]:
     return json.loads(path.read_text(encoding="utf-8")).get("facts", [])
 
 
-def ask_for(fact: Dict[str, str], templates: Sequence[str]) -> str:
+def ask_for(fact: dict[str, str], templates: Sequence[str]) -> str:
     if fact.get("question"):
         return str(fact["question"])
     if not templates:
@@ -74,14 +73,14 @@ def ask_for(fact: Dict[str, str], templates: Sequence[str]) -> str:
     return str(templates[0]).replace("{subject}", str(fact.get("subject", "")))
 
 
-def expected_for(fact: Dict[str, str]) -> str:
+def expected_for(fact: dict[str, str]) -> str:
     answer = str(fact.get("answer", "")).strip()
     return answer if answer[-1:] in TERMINATORS else answer + " ."
 
 
 def score(
     predictor: LanguageModelPredictor,
-    facts: Sequence[Dict[str, str]],
+    facts: Sequence[dict[str, str]],
     templates: Sequence[str],
     max_new_tokens: int = 0,
 ) -> RecallReport:
@@ -91,9 +90,13 @@ def score(
     for fact in facts:
         question = ask_for(fact, templates)
         expected = expected_for(fact)
-        written = predictor.predict(question + " ", max_new_tokens=budget).completion.strip()
+        written = predictor.predict(
+            question + " ", max_new_tokens=budget
+        ).completion.strip()
 
-        correct = written.rstrip(TERMINATORS + " ") == expected.rstrip(TERMINATORS + " ")
+        correct = written.rstrip(TERMINATORS + " ") == expected.rstrip(
+            TERMINATORS + " "
+        )
         report.asked += 1
         report.right += int(correct)
 
@@ -109,20 +112,28 @@ def score(
     return report
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Ask a checkpoint every fact its corpus was built from.",
         epilog="Example:\n"
-               "  python scripts/recall.py --checkpoint checkpoints/ored_v2/best.pt",
+        "  python scripts/recall.py --checkpoint checkpoints/ored_v2/best.pt",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
-    parser.add_argument("--tokens", type=int, default=0,
-                        help="characters to write per answer (default: the longest answer)")
-    parser.add_argument("--misses", type=int, default=MISSES_SHOWN,
-                        help="how many wrong answers to print (0 = none)")
+    parser.add_argument(
+        "--tokens",
+        type=int,
+        default=0,
+        help="characters to write per answer (default: the longest answer)",
+    )
+    parser.add_argument(
+        "--misses",
+        type=int,
+        default=MISSES_SHOWN,
+        help="how many wrong answers to print (0 = none)",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -150,7 +161,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.misses and report.misses:
         logger.info("")
         logger.info(f"Wrong ({len(report.misses)} of {report.asked}):")
-        for miss in report.misses[:args.misses]:
+        for miss in report.misses[: args.misses]:
             logger.info(f"  {miss.question}")
             logger.info(f"    wanted : {miss.expected}")
             logger.info(f"    wrote  : {miss.written or '(nothing)'}")
