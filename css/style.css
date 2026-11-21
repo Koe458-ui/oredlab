@@ -1,3 +1,9 @@
+:root {
+  --acid-yellow: #d6ed17;
+  --charcoal: #606060;
+  --off-white: #fcf6f5;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -33,13 +39,15 @@ body {
 .hero-content {
   position: relative;
   z-index: 1;
+  width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  text-align: center;
-  color: #fff;
+  padding: clamp(20px, 7vw, 96px);
+  text-align: left;
+  color: var(--off-white);
 }
 .star {
   animation: twinkle 3s ease-in-out infinite;
@@ -56,22 +64,22 @@ body {
 
 .retro-banner {
   position: relative;
-  width: min(530px, 88vw);
+  width: min(530px, 100%);
   z-index: 2;
 }
 
 .retro-shadow {
   position: absolute;
   inset: 25px 20px -20px -20px;
-  background: #1748f5;
-  border: 2px solid #080808;
+  background: var(--acid-yellow);
+  border: 2px solid var(--charcoal);
   border-radius: 35px;
 }
 
 .retro-window {
   position: relative;
-  background: #fff;
-  border: 4px solid #080808;
+  background: var(--off-white);
+  border: 4px solid var(--charcoal);
   border-radius: 82px;
   padding: 18px 16px 20px;
 }
@@ -85,25 +93,22 @@ body {
 .control {
   width: 29px;
   height: 29px;
-  border: 2px solid #080808;
+  border: 2px solid var(--charcoal);
   border-radius: 50%;
 }
 
-.yellow { background: #d9ed16; }
-.cyan { background: #00c7e9; }
-.blue { background: #2855ef; }
+.yellow { background: var(--acid-yellow); }
+.offwhite { background: var(--off-white); }
+.charcoal { background: var(--charcoal); }
 
 .retro-panel {
   min-height: 390px;
   padding: 32px 40px;
-  border: 2px solid #080808;
+  border: 2px solid var(--charcoal);
   border-radius: 45px;
-  background: linear-gradient(
-    150deg,
-    #3152f5 0%,
-    #0066dc 100%
-  );
-  color: white;
+  background: var(--charcoal);
+  color: var(--off-white);
+  text-align: left;
 }
 
 .retro-panel h1 {
@@ -120,12 +125,12 @@ body {
 }
 
 .retro-solid {
-  color: white;
+  color: var(--acid-yellow);
 }
 
 .retro-outline {
   color: transparent;
-  -webkit-text-stroke: 2px white;
+  -webkit-text-stroke: 2px var(--off-white);
 }
 
 .retro-panel p {
@@ -133,12 +138,17 @@ body {
   font-family: Arial, sans-serif;
   font-size: 16px;
   line-height: 1.15;
-  color: white;
+  color: var(--off-white);
+  text-align: left;
 }
 
 @media (max-width: 600px) {
+  .hero-content {
+    padding: 20px;
+  }
+
   .retro-banner {
-    width: 88vw;
+    width: 100%;
   }
 
   .retro-window {
