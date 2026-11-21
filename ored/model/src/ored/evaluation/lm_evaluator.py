@@ -107,7 +107,7 @@ def evaluate_token_model(
     resolved = info["device"]
     try:
         val = measure_token_shards(model, cfg, resolved, info["tokenizer_info"])
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- report optional operation failures and keep the primary result
         val = None
         logger.info(f"validation skipped: the token shards could not be read ({exc})")
     if val is not None:

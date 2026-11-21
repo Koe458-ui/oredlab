@@ -130,7 +130,7 @@ def test_every_worker_gets_its_own_share_of_the_data(cfg, tmp_path):
     ), "shards overlap beyond DistributedSampler's padding"
     assert set().union(*train) == set(range(len_train(cfg)))
     val = [r["val_indices"] for r in ranks]
-    assert sorted(sum(val, [])) == list(range(sum(len(v) for v in val))), (
+    assert sorted(index for indices in val for index in indices) == list(range(sum(len(v) for v in val))), (
         "validation must be split exactly"
     )
     assert not set(val[0]) & set(val[1])
@@ -416,7 +416,7 @@ def trained_group(cfg, tmp_path, world=3):
 
 def test_corrupt_and_missing_shards_are_detected(cfg, tmp_path):
     live = trained_group(cfg, tmp_path)
-    manifest, problems = verify_group_dir(live)
+    _manifest, problems = verify_group_dir(live)
     assert problems == []
 
     shard = live / "__1_0.distcp"

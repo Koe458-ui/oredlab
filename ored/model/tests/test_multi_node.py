@@ -84,6 +84,7 @@ def test_three_nodes_find_each_other_train_and_resume_on_two(tiny_corpus, tmp_pa
             "--config",
             str(config),
         ],
+        check=False,
         env=dict(os.environ, PYTHONPATH=str(SRC)),
         capture_output=True,
         text=True,

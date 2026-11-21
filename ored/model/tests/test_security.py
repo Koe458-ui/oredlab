@@ -25,8 +25,13 @@ from ored.learning.supabase_store import SupabaseStore
 from ored.serving.server import InsecureServerError, OredHandler, check_exposure
 from ored.training.trainer import main as train_main
 from test_checkpoint_store import FakeBucket
-from test_online import learner
-from test_training_data import CONFIG, cfg, row, store, synthetic_rows
+import test_online
+import test_training_data
+from test_training_data import CONFIG, row, synthetic_rows
+
+learner = test_online.learner
+cfg = test_training_data.cfg
+store = test_training_data.store
 
 KEY = "unit-test-key-not-a-real-secret"
 

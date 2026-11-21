@@ -71,7 +71,7 @@ def test_corpus_arithmetic_is_correct(tiny_corpus):
 
 
 def test_tokenizer_is_fitted_on_training_text_only(tiny_corpus):
-    datasets, tokenizer = build_text_datasets(tiny_corpus)
+    _datasets, tokenizer = build_text_datasets(tiny_corpus)
     train_text = read_corpus(tiny_corpus.data.corpus.dir, "train")
     learned = {tokenizer.decode([i]) for i in range(256, tokenizer.vocab_size)}
     assert learned and all(piece in train_text for piece in learned)
@@ -79,7 +79,7 @@ def test_tokenizer_is_fitted_on_training_text_only(tiny_corpus):
 
 
 def test_dataloaders_produce_correct_batch_shapes(tiny_corpus):
-    loaders, datasets, tokenizer = build_text_dataloaders(tiny_corpus)
+    loaders, _datasets, tokenizer = build_text_dataloaders(tiny_corpus)
     ids, targets = next(iter(loaders["train"]))
     assert ids.shape[1] == tiny_corpus.data.block_size
     assert ids.shape == targets.shape

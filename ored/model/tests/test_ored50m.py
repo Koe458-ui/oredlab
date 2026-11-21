@@ -355,19 +355,19 @@ def test_optional_formats_fail_clearly_without_their_package(tmp_path):
     pq = tmp_path / "x.parquet"
     pq.write_bytes(b"PAR1" + b"\x00" * 16)
     try:
-        import zstandard
+        import zstandard  # noqa: F401 -- probe the optional dependency
     except ImportError:
         with pytest.raises(ReaderError, match="pip install zstandard"):
             list(open_reader(zst, "body"))
     try:
-        import pyarrow
+        import pyarrow  # noqa: F401 -- probe the optional dependency
     except ImportError:
         with pytest.raises(ReaderError, match="pip install pyarrow"):
             list(open_reader(pq, "body"))
 
 
 def test_shards_manifest_counts_and_windows(shards, tokenizer):
-    out, manifest, sources, _, info = shards
+    out, manifest, _sources, _, info = shards
     assert (
         manifest["tokenizer"]["sha256"] == info["sha256"]
         and manifest["dtype"] == "uint16"
@@ -399,7 +399,7 @@ def test_shards_manifest_counts_and_windows(shards, tokenizer):
 def test_shard_build_is_deterministic_and_resumable(
     shards, tmp_path, tokenizer, monkeypatch
 ):
-    out, manifest, sources, settings, info = shards
+    _out, manifest, sources, settings, info = shards
     import ored.data.token_shards as ts
 
     real = ts.tokenize_unit
@@ -453,7 +453,7 @@ def test_shard_build_is_deterministic_and_resumable(
 
 
 def test_split_is_by_document_id(shards, tokenizer, tmp_path):
-    out, manifest, sources, settings, info = shards
+    _out, _manifest, _sources, settings, info = shards
     reordered = [
         write_jsonl(tmp_path / "c.jsonl", list(reversed(synthetic_docs(120, 1, "a"))))
     ]
@@ -648,7 +648,7 @@ def test_failed_save_leaves_the_previous_best(tmp_path, monkeypatch):
         path.write_bytes(b"not a checkpoint")
 
     monkeypatch.setattr(best, "_write", corrupt)
-    with pytest.raises(Exception):
+    with pytest.raises(RuntimeError, match="mmap"):
         best.consider(1.0, lambda: _payload(2, 1.0))
     monkeypatch.undo()
     with pytest.raises(BestCheckpointError, match="lacks"):

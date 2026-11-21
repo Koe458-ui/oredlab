@@ -39,7 +39,9 @@ from ored.training.trainer import main as train_main
 from ored.training.trainer import train
 from ored.utils.checkpoint import load_checkpoint
 from test_checkpoint_store import FakeBucket
-from test_inference import trained_lm_checkpoint
+import test_inference
+
+trained_lm_checkpoint = test_inference.trained_lm_checkpoint
 
 CONFIG = Path(__file__).resolve().parent / "configs" / "language_model.yaml"
 
@@ -460,7 +462,7 @@ def remote(store, monkeypatch):
 
 
 def test_training_end_to_end_records_the_dataset(remote, cfg, caplog):
-    store, checkpoints, datasets = remote
+    store, _checkpoints, datasets = remote
     cfg.checkpoint.upload = True
     caplog.set_level("INFO")
     result = train(cfg)

@@ -69,7 +69,7 @@ def _open_binary(path: Path, compression: str | None) -> BinaryIO:
                 f"{path.name} is zstd-compressed: pip install zstandard "
                 f"(optional dependency, see pyproject extras 'corpus')"
             ) from exc
-        raw = open(path, "rb")
+        raw = open(path, "rb")  # noqa: SIM115 -- the owning stream or writer closes this handle
         return io.BufferedReader(
             zstandard.ZstdDecompressor().stream_reader(
                 raw, read_across_frames=True, closefd=True

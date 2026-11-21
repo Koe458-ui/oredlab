@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import ClassVar
 import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,7 +18,7 @@ from ored.learning.r2 import R2Store, copy_bucket
 
 
 class FakeS3(BaseHTTPRequestHandler):
-    objects: dict = {}
+    objects: ClassVar[dict] = {}
     page = 2
 
     def log_message(self, *args):

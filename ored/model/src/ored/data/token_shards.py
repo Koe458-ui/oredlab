@@ -70,7 +70,7 @@ class _ShardWriter:
     def _open(self) -> None:
         path = self.directory / self._name()
         path.parent.mkdir(parents=True, exist_ok=True)
-        self._handle = open(path.with_suffix(".bin.part"), "wb")
+        self._handle = open(path.with_suffix(".bin.part"), "wb")  # noqa: SIM115 -- the owning stream or writer closes this handle
         self._sha = hashlib.sha256()
         self._tokens = self._documents = 0
         self._buffer = array(_array_code(self.dtype))

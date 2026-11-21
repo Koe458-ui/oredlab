@@ -536,7 +536,7 @@ class PretrainTrainer:
         try:
             replace_object(self.store, self.best.path, self.r2_object)
             logger.info(f"  best.pt replaced in R2 at {self.r2_object}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- report optional operation failures and keep the primary result
             self.upload_errors.append(f"{self.r2_object}: {exc}")
             logger.error(f"  R2 upload of best.pt failed (local best.pt kept): {exc}")
 

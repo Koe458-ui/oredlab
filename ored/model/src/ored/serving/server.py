@@ -34,7 +34,7 @@ class OredHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        logger.info("%s - %s" % (self.address_string(), fmt % args))
+        logger.info("%s - %s", self.address_string(), fmt % args)
 
     def _send(self, payload: dict[str, Any], status: int = 200) -> None:
         body = json.dumps(payload).encode("utf-8")

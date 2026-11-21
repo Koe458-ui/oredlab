@@ -103,6 +103,7 @@ def test_the_module_imports_on_its_own(module):
     src = Path(__file__).resolve().parent.parent / "src"
     result = subprocess.run(
         [sys.executable, "-c", f"import {module}"],
+        check=False,
         capture_output=True,
         text=True,
         env={"PYTHONPATH": str(src), "PATH": ""},

@@ -54,12 +54,11 @@ def _documents(
     per_file_bytes = -(-max_bytes // len(paths)) if max_bytes else 0
     for path in paths:
         used = 0
-        count = 0
-        for doc in open_reader(
+        documents = open_reader(
             path, text_field, id_field, file_format=fmt
-        ).iter_documents():
+        ).iter_documents()
+        for count, doc in enumerate(documents, start=1):
             yield doc.text
-            count += 1
             used += len(doc.text.encode("utf-8"))
             if (per_file_documents and count >= per_file_documents) or (
                 per_file_bytes and used >= per_file_bytes

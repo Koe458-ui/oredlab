@@ -107,7 +107,7 @@ def _decompress(path: Path, kind: str) -> Path:
     target = path.with_suffix("")
     part = target.with_name(target.name + ".part")
     if kind == "gzip":
-        source = io.BufferedReader(gzip.open(path, "rb"))
+        source = io.BufferedReader(gzip.open(path, "rb"))  # noqa: SIM115 -- the owning stream or writer closes this handle
     else:
         try:
             import zstandard
@@ -117,7 +117,7 @@ def _decompress(path: Path, kind: str) -> Path:
             ) from exc
         source = io.BufferedReader(
             zstandard.ZstdDecompressor().stream_reader(
-                open(path, "rb"), read_across_frames=True, closefd=True
+                open(path, "rb"), read_across_frames=True, closefd=True  # noqa: SIM115 -- the owning stream or writer closes this handle
             )
         )
     with source, open(part, "wb") as out:

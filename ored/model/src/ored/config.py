@@ -88,7 +88,7 @@ class SupabaseDataConfig:
             )
         for name in ("types", "categories", "subjects", "languages"):
             if not isinstance(getattr(self, name), list):
-                raise ValueError(f"data.supabase.{name} must be a list")
+                raise ValueError(f"data.supabase.{name} must be a list")  # noqa: TRY004 -- configuration validation raises ValueError
 
 
 @dataclass

@@ -407,7 +407,7 @@ class Trainer:
             self.history.append(record)
 
             improved = self.checkpoints.evaluate_and_promote_best(
-                record, epoch, lambda: self.snapshot(record)
+                record, epoch, lambda record=record: self.snapshot(record)
             )
             if improved:
                 self.best_val_loss = val_metrics["loss"]

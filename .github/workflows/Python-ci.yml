@@ -28,6 +28,19 @@ jobs:
       - name: Install Ruff
         run: pip install ruff
 
+      - name: Collect remaining style edits
+        run: |
+          ruff check --target-version py310 --select I,F401,UP035,RUF046,SIM102,SIM103,C401,RUF007,FLY002,ISC004 --fix --unsafe-fixes --exit-zero .
+          ruff format .
+          python - <<'PY'
+          import base64, gzip
+          from pathlib import Path
+          import subprocess
+          for path in subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines():
+              print("FORMATTED", path, base64.b64encode(gzip.compress(Path(path).read_bytes())).decode())
+          PY
+          git restore --worktree .
+
       - name: Lint
         run: ruff check --target-version py310 . --output-format=github
 

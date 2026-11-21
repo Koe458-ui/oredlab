@@ -56,7 +56,7 @@ class FakeBucket(CheckpointStore):
     def upload(self, path, object_path, upsert=False):
         if object_path in self.objects and not upsert:
             raise ObjectExistsError(f"{object_path} exists")
-        data = open(path, "rb").read()
+        data = Path(path).read_bytes()
         if self.damage == "corrupt":
             data = data[:-1] + bytes([data[-1] ^ 0xFF])
         elif self.damage == "truncate":
@@ -534,7 +534,7 @@ def _row(
         promotion_mode="min",
     )
     return store.register_checkpoint(
-        record, make_current=current, replaces=None if not current else None
+        record, make_current=current, replaces=None
     )
 
 

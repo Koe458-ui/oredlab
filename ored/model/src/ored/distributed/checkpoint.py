@@ -683,7 +683,7 @@ class DistributedCheckpointManager(CheckpointManager):
     def _shard_record(
         self, kind: str, group_id: str, entry: dict[str, Any], snapshot: dict[str, Any]
     ) -> Checkpoint:
-        store, files = self.remote
+        _store, files = self.remote
         return Checkpoint(
             kind=CheckpointKind(kind),
             run_name=self.run_name,

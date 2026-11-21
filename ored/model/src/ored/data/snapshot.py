@@ -208,7 +208,7 @@ class _Writer:
     def __post_init__(self) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)
         for name in FILES:
-            self.handles[name] = open(
+            self.handles[name] = open(  # noqa: SIM115 -- the owning stream or writer closes this handle
                 self.directory / name, "w", encoding="utf-8", newline="\n"
             )
         self.content.update(

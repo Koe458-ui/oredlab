@@ -23,7 +23,7 @@ def register_model(name: str) -> Callable[[type[nn.Module]], type[nn.Module]]:
 
 
 def _import_all_models() -> None:
-    from ored.models import transformer as _tf
+    from ored.models import transformer as _tf  # noqa: F401 -- registers the transformer
 
 
 def build_model(cfg: Config, **extra: Any) -> nn.Module:

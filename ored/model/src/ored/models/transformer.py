@@ -189,7 +189,7 @@ class Transformer(OredModel):
             raise ValueError(
                 f"expected ids of shape (batch, seq), got {tuple(ids.shape)}"
             )
-        B, T = ids.shape
+        _B, T = ids.shape
         if T > self.block_size:
             raise ValueError(
                 f"sequence length {T} exceeds block_size {self.block_size}: the "

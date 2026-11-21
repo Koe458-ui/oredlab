@@ -129,7 +129,7 @@ def test_invalid_temperature_is_rejected(setup):
 
 
 def test_batched_input_is_rejected(setup):
-    model, tokenizer = setup
+    model, _tokenizer = setup
     with pytest.raises(ValueError, match="shape"):
         generate_tokens(
             model, torch.zeros(2, 4, dtype=torch.long), max_new_tokens=5, block_size=16
