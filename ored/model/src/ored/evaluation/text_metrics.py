@@ -53,7 +53,7 @@ class TextQuality:
         return self.valid_lines / self.total_lines if self.total_lines else 0.0
 
 
-def score_text(text: str, grammar: Dict[str, object], keep_examples: int = 5,
+def score_text(text: str, grammar: Dict[str, Sequence[str]], keep_examples: int = 5,
                reverse_answer: bool = False) -> TextQuality:
     patterns = build_template_patterns(grammar)
     lines = text.split("\n")

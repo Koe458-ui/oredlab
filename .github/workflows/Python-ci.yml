@@ -33,6 +33,14 @@ jobs:
           ruff check . --fix --extend-unfixable F401,F811 --exit-zero
           ruff format .
           git diff --binary > "$RUNNER_TEMP/ruff.patch"
+          python - <<'PY'
+          import base64, gzip
+          from pathlib import Path
+          import subprocess
+          for path in subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines():
+              data = gzip.compress(Path(path).read_bytes())
+              print("FORMATTED", path, base64.b64encode(data).decode())
+          PY
           git restore --worktree .
       - uses: actions/upload-artifact@v4
         with:
