@@ -75,7 +75,7 @@ def inspect(
             word for word in WORD_RE.findall(text) if word.lower() not in known_words
         })
 
-    symbols = "".join(s for s in getattr(tokenizer, "alphabet", tokenizer.itos[1:]) if s != "\n")
+    symbols = "".join(s for s in tokenizer.alphabet if s != "\n")
     return VocabReport(
         text=text,
         vocab_size=tokenizer.vocab_size,

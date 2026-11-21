@@ -179,7 +179,7 @@ class CheckpointStore:
                 for chunk in iter(lambda: handle.read(self.max_object_bytes), b""):
                     self._put(part_path(object_path, count), chunk, upsert)
                     count += 1
-            stale = [p for p, _ in old_parts if int(PART_SUFFIX.match(p).group("index")) >= count]
+            stale = [p for p, _ in old_parts if (match := PART_SUFFIX.match(p)) and int(match.group("index")) >= count]
             if whole is not None:
                 stale.append(object_path)
             for extra in stale:

@@ -11,7 +11,7 @@ from typing import Dict, List, Sequence
 import yaml
 
 from ored.config import Config, load_config
-from ored.data.corpus import SPLITS, generate_corpus
+from ored.data.corpus import SPLITS, CorpusStats, generate_corpus
 from ored.utils.logging_utils import get_logger, section
 
 logger = get_logger(__name__)
@@ -148,12 +148,12 @@ def generate_fact_corpus(
     spec: FactSpec,
     repeats: int = 60,
     force: bool = True,
-) -> Dict[str, object]:
+) -> Dict[str, CorpusStats]:
     if repeats < 1:
         raise FactsError("repeats must be >= 1")
 
     counts = repeats_by_split(repeats, cfg.data.corpus.val_test_fraction)
-    extra_lines = {
+    extra_lines: Dict[str, Sequence[str]] = {
         split: fact_lines(spec, counts[split], random.Random(cfg.seed + SPLITS.index(split)))
         for split in SPLITS
     }

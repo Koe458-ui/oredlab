@@ -131,5 +131,5 @@ def _entry(rank: int, fn: Callable[..., Any], world_size: int, port: int, env: D
         raise
 
 
-def run_workers(fn: Callable[..., Any], world_size: int, *args: Any, env: Dict[str, str] = None) -> None:
+def run_workers(fn: Callable[..., Any], world_size: int, *args: Any, env: Dict[str, str] | None = None) -> None:
     mp.spawn(_entry, args=(fn, world_size, free_port(), env or {}, args), nprocs=world_size, join=True)

@@ -171,7 +171,7 @@ def cmd_register(args: argparse.Namespace) -> int:
 def cmd_update_registry(args: argparse.Namespace) -> int:
     from ored.learning.supabase_store import SupabaseStore
 
-    fields = {}
+    fields: dict[str, str | int | None] = {}
     for assignment in args.set:
         key, _, value = assignment.partition("=")
         if value == "null":

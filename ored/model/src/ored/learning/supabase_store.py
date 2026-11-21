@@ -120,7 +120,7 @@ class SupabaseStore:
 
     @staticmethod
     def _build(record_type: Type[T], row: Dict[str, Any]) -> T:
-        fields = {f for f in record_type.__dataclass_fields__}
+        fields = vars(record_type)["__dataclass_fields__"]
         return record_type(**{k: v for k, v in row.items() if k in fields})
 
     def datasets(self, name: Optional[str] = None) -> List[Dataset]:

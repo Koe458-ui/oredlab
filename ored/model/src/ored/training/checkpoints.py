@@ -149,13 +149,13 @@ class CheckpointManager:
         self._publish("base", path)
         return path
 
-    def save_live_checkpoint(self, snapshot: Snapshot) -> Path:
+    def save_live_checkpoint(self, snapshot: Snapshot) -> Path | None:
         path = self._write("live", self.path("live"), snapshot)
         self.last_live_step = int(snapshot["global_step"])
         self._publish("live", path)
         return path
 
-    def save_history_checkpoint(self, snapshot: Snapshot) -> Path:
+    def save_history_checkpoint(self, snapshot: Snapshot) -> Path | None:
         path = self.history_dir / history_filename(snapshot["epoch"], snapshot["global_step"])
         path = self._write("history", path, snapshot)
         self._publish("history", path)
@@ -181,7 +181,7 @@ class CheckpointManager:
             "epoch": self.best_epoch,
         }
 
-    def export_model(self, source: str = "best") -> Path:
+    def export_model(self, source: str = "best") -> Path | None:
         payload = load_checkpoint(self.path(source))
         path = write_payload(self.path("export"), as_kind(payload, "export"))
         self._publish("export", path)

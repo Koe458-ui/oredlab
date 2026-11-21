@@ -26,6 +26,18 @@ def register_tokenizer(name: str) -> Callable[[Type["Tokenizer"]], Type["Tokeniz
 class Tokenizer:
 
     name: str = "base"
+    itos: List[str]
+
+    @property
+    def alphabet(self) -> List[str]:
+        return self.itos[1:]
+
+    @classmethod
+    def from_text(cls, text: str, **options: Any) -> "Tokenizer":
+        raise NotImplementedError
+
+    def describe(self) -> str:
+        raise NotImplementedError
 
     @property
     def vocab_size(self) -> int:

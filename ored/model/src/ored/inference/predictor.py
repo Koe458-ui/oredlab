@@ -359,6 +359,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         logger.info(predictor.describe())
         logger.info("")
 
+    if not isinstance(predictor, LanguageModelPredictor):
+        raise TypeError("This command requires a language model checkpoint")
     return _run_language_model(predictor, args)
 
 

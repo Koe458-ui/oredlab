@@ -43,6 +43,8 @@ def quiet_other_ranks(env: DistEnv) -> None:
 
 
 class DistributedTrainer(Trainer):
+    checkpoints: DistributedCheckpointManager
+    result: Dict[str, Any]
 
     def __init__(self, cfg: Config, env: DistEnv, control: Optional[ControlPlane] = None,
                  remote: Any = None) -> None:

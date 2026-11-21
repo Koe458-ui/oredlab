@@ -88,7 +88,7 @@ def _decompress(path: Path, kind: str) -> Path:
     target = path.with_suffix("")
     part = target.with_name(target.name + ".part")
     if kind == "gzip":
-        source = gzip.open(path, "rb")
+        source = io.BufferedReader(gzip.open(path, "rb"))
     else:
         try:
             import zstandard

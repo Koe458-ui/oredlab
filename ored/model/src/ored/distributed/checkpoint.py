@@ -320,6 +320,7 @@ class DistributedCheckpointManager(CheckpointManager):
         snapshot = make_snapshot()
         path = self._save_group("best", snapshot)
         if self.env.is_coordinator and path is not None:
+            assert self.last_group is not None
             payload = build_payload(kind="best", **snapshot)
             payload["extra"] = {**(payload.get("extra") or {}),
                                 "checkpoint_group_id": self.last_group["group_id"]}

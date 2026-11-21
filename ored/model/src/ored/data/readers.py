@@ -57,7 +57,7 @@ def _open_binary(path: Path, compression: Optional[str]) -> BinaryIO:
     if compression is None:
         return open(path, "rb")
     if compression == "gzip":
-        return gzip.open(path, "rb")
+        return io.BufferedReader(gzip.open(path, "rb"))
     if compression == "zstd":
         try:
             import zstandard
@@ -243,8 +243,8 @@ def inspect_file(path: str | Path, max_records: int = 5) -> Dict[str, Any]:
         handle = parquet.ParquetFile(path)
         report["parquet_rows"] = handle.metadata.num_rows
         report["parquet_schema"] = [f"{f.name}: {f.type}" for f in handle.schema_arrow]
-        records = next(handle.iter_batches(batch_size=max_records), None)
-        records = records.to_pylist() if records is not None else []
+        batch = next(handle.iter_batches(batch_size=max_records), None)
+        records = batch.to_pylist() if batch is not None else []
     else:
         records = []
     report["records_sampled"] = len(records)

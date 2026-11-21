@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Tuple
 import yaml
 
 from ored.data.training_data import normalise_fields
+from ored.learning.records import TrainingData
 
 DEFAULT_FACTS = "configs/facts.yaml"
 FACTS_TAG = "facts"
@@ -51,8 +52,7 @@ def _arithmetic(question: str) -> Optional[Tuple[str, str]]:
     return operation, f"{operation}:{left},{right}"
 
 
-def fact_to_row(fact: Dict[str, object], dataset_tag: str = FACTS_TAG, verified: bool = True) -> object:
-    from ored.learning.records import TrainingData
+def fact_to_row(fact: Dict[str, object], dataset_tag: str = FACTS_TAG, verified: bool = True) -> TrainingData:
 
     original = str(fact.get("category") or "").strip()
     if original not in FACT_CATEGORIES:
@@ -81,7 +81,7 @@ def fact_to_row(fact: Dict[str, object], dataset_tag: str = FACTS_TAG, verified:
 
 
 def facts_to_rows(path: str | Path = DEFAULT_FACTS, dataset_tag: str = FACTS_TAG,
-                  verified: bool = True) -> List[object]:
+                  verified: bool = True) -> List[TrainingData]:
     raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     facts = raw.get("facts") or []
     if raw.get("questions"):

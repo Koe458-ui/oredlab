@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Sequence, Tuple
 
 
-def build_template_patterns(grammar: Dict[str, object]) -> List[re.Pattern]:
+def build_template_patterns(grammar: Dict[str, Sequence[str]]) -> List[re.Pattern]:
     slots = {
         "adj": grammar["adjectives"],
         "noun": grammar["nouns"],

@@ -85,6 +85,7 @@ class _ShardWriter:
     def add(self, ids: Sequence[int]) -> None:
         if self._handle is None:
             self._open()
+        assert self._buffer is not None
         self._buffer.extend(ids)
         self._tokens += len(ids)
         self._documents += 1
@@ -259,7 +260,7 @@ def build_token_shards(sources: Sequence[str | Path], tokenizer: Tokenizer, toke
     paths = [Path(p) for p in sources]
     log(f"hashing {len(paths)} source file(s) ...")
     from ored.data.readers import detect_format
-    described = []
+    described: List[Dict[str, Any]] = []
     for path in paths:
         detected = detect_format(path)
         described.append({"file_name": path.name, "size_bytes": path.stat().st_size,
@@ -279,10 +280,10 @@ def build_token_shards(sources: Sequence[str | Path], tokenizer: Tokenizer, toke
     for unit in units:
         if unit["key"] in progress["units"] or unit["key"] not in reusable:
             continue
-        directory, record = reusable[unit["key"]]
-        for shard in record["shards"]:
+        directory, cached_unit = reusable[unit["key"]]
+        for shard in cached_unit["shards"]:
             _link(directory / shard["path"], out_dir / shard["path"])
-        progress["units"][unit["key"]] = record
+        progress["units"][unit["key"]] = cached_unit
         _write_json(out_dir / PROGRESS, progress)
         log(f"unit {unit['key']} reused from {directory}")
 
