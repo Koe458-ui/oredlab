@@ -53,3 +53,101 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .star { animation: none; }
 }
+
+.retro-banner {
+  position: relative;
+  width: min(530px, 88vw);
+  z-index: 2;
+}
+
+.retro-shadow {
+  position: absolute;
+  inset: 25px 20px -20px -20px;
+  background: #1748f5;
+  border: 2px solid #080808;
+  border-radius: 35px;
+}
+
+.retro-window {
+  position: relative;
+  background: #fff;
+  border: 4px solid #080808;
+  border-radius: 82px;
+  padding: 18px 16px 20px;
+}
+
+.window-controls {
+  display: flex;
+  gap: 14px;
+  padding: 0 14px 25px;
+}
+
+.control {
+  width: 29px;
+  height: 29px;
+  border: 2px solid #080808;
+  border-radius: 50%;
+}
+
+.yellow { background: #d9ed16; }
+.cyan { background: #00c7e9; }
+.blue { background: #2855ef; }
+
+.retro-panel {
+  min-height: 390px;
+  padding: 32px 40px;
+  border: 2px solid #080808;
+  border-radius: 45px;
+  background: linear-gradient(
+    150deg,
+    #3152f5 0%,
+    #0066dc 100%
+  );
+  color: white;
+}
+
+.retro-panel h1 {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  font-size: clamp(55px, 8vw, 104px);
+  font-weight: 900;
+  letter-spacing: -4px;
+  line-height: 0.87;
+}
+
+.retro-panel h1 span {
+  display: block;
+}
+
+.retro-solid {
+  color: white;
+}
+
+.retro-outline {
+  color: transparent;
+  -webkit-text-stroke: 2px white;
+}
+
+.retro-panel p {
+  margin-top: 27px;
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.15;
+  color: white;
+}
+
+@media (max-width: 600px) {
+  .retro-banner {
+    width: 88vw;
+  }
+
+  .retro-window {
+    border-radius: 55px;
+  }
+
+  .retro-panel {
+    min-height: 320px;
+    padding: 28px 25px;
+    border-radius: 35px;
+  }
+}
