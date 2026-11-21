@@ -18,6 +18,7 @@ RAW_SUFFIXES = (
     ".jsonl.zst",
     ".json.zst",
     ".parquet",
+    ".txt",
 )
 
 
@@ -33,7 +34,7 @@ def _expand(inputs: list[str]) -> list[str]:
             )
             if not found:
                 raise SystemExit(
-                    f"{path} holds no .jsonl / .jsonl.gz / .jsonl.zst / .parquet files"
+                    f"{path} holds no supported JSONL, Parquet, or text files"
                 )
             files.extend(found)
         else:
@@ -48,13 +49,18 @@ def _documents(
     fmt: str | None,
     max_documents: int,
     max_bytes: int,
+    text_delimiter: str,
 ) -> Iterator[str]:
     per_file_documents = -(-max_documents // len(paths)) if max_documents else 0
     per_file_bytes = -(-max_bytes // len(paths)) if max_bytes else 0
     for path in paths:
         used = 0
         documents = open_reader(
-            path, text_field, id_field, file_format=fmt
+            path,
+            text_field,
+            id_field,
+            file_format=fmt,
+            text_delimiter=text_delimiter,
         ).iter_documents()
         for count, doc in enumerate(documents, start=1):
             yield doc.text
@@ -83,6 +89,7 @@ def cmd_train_tokenizer(args: argparse.Namespace) -> int:
         args.format,
         args.max_documents,
         args.max_bytes,
+        args.text_delimiter,
     )
     words, seen = count_words(texts)
     print(
@@ -103,6 +110,7 @@ def cmd_train_tokenizer(args: argparse.Namespace) -> int:
                 for p in args.input
             ],
             "text_field": args.text_field,
+            "text_delimiter": args.text_delimiter,
             "max_documents": args.max_documents,
             "max_bytes": args.max_bytes,
             "vocab_size_requested": args.vocab_size,
@@ -130,6 +138,7 @@ def cmd_build_shards(args: argparse.Namespace) -> int:
         },
         max_tokens_per_shard=args.max_tokens_per_shard,
         chunk_bytes=args.chunk_mb * 1024 * 1024,
+        text_delimiter=args.text_delimiter,
     )
     manifest = build_token_shards(
         _expand(args.input),
@@ -409,7 +418,8 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("train-tokenizer")
     p.add_argument("--input", nargs="+", required=True)
     p.add_argument("--text-field", required=True)
-    p.add_argument("--format", choices=["jsonl", "parquet"])
+    p.add_argument("--format", choices=["jsonl", "parquet", "text"])
+    p.add_argument("--text-delimiter", default="")
     p.add_argument("--vocab-size", type=int, default=16384)
     p.add_argument("--max-documents", type=int, default=0)
     p.add_argument(
@@ -424,7 +434,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--input", nargs="+", required=True)
     p.add_argument("--text-field", required=True)
     p.add_argument("--id-field")
-    p.add_argument("--format", choices=["jsonl", "parquet"])
+    p.add_argument("--format", choices=["jsonl", "parquet", "text"])
+    p.add_argument("--text-delimiter", default="")
     p.add_argument(
         "--tokenizer", required=True, help="tokenizer artifact (train-tokenizer --out)"
     )

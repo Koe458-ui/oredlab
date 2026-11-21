@@ -337,6 +337,42 @@ def test_format_detection_and_inspection_show_fields_not_content(tmp_path):
     assert len(list(open_reader(plain, "body", file_format="jsonl"))) == 3
 
 
+def test_text_inspection_reports_delimiter_counts_without_content(tmp_path):
+    path = tmp_path / "tinystories.txt"
+    path.write_text("story one<|endoftext|>\n\nstory two", encoding="utf-8")
+
+    report = inspect_file(path)
+
+    assert report["file_format"] == "text"
+    assert report["text_delimiter_counts"] == {
+        "<|endoftext|>": 1,
+        "blank_lines": 1,
+        "line_breaks": 2,
+    }
+    assert "story one" not in json.dumps(report)
+
+
+def test_text_reader_requires_and_uses_explicit_delimiter(tmp_path):
+    path = tmp_path / "records.txt"
+    path.write_text("first<|record|>second<|record|>", encoding="utf-8")
+
+    with pytest.raises(ReaderError, match="explicit text delimiter"):
+        list(open_reader(path, "text"))
+    documents = open_reader(path, "text", text_delimiter="<|record|>")
+    assert [doc.text for doc in documents] == [
+        "first",
+        "second",
+    ]
+
+
+def test_text_reader_accepts_blank_line_alias(tmp_path):
+    path = tmp_path / "records.txt"
+    path.write_text("first\n \nsecond", encoding="utf-8")
+
+    documents = open_reader(path, "text", text_delimiter="blank-line")
+    assert [doc.text for doc in documents] == ["first", "second"]
+
+
 def test_readers_need_explicit_fields(tmp_path):
     path = write_jsonl(
         tmp_path / "x.jsonl", [{"body": "hi"}, {"body": ""}, {"other": 1}]
