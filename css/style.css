@@ -161,7 +161,13 @@ body {
     border-radius: 35px;
   }
 }
-.hero-content { overflow: auto; }
+.hero-content { overflow: clip; }
+.retro-banner {
+  width: 530px;
+  flex: none;
+  scale: min(1, tan(atan2(100vw, 1080px)), tan(atan2(100svh, 820px)));
+}
+.retro-panel { min-height: 390px; }
 
 .banner-2 {
   position: absolute;
