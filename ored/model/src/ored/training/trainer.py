@@ -749,7 +749,7 @@ def apply_dataset_arguments(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Train an Ored AI model.")
-    parser.add_argument("--config", default="configs/ored50m.yaml")
+    parser.add_argument("--config", default="configs/ored250m.yaml")
     parser.add_argument(
         "--set",
         dest="overrides",

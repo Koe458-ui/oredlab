@@ -143,10 +143,10 @@ See what checkpoints u have:
 python scripts/checkpoints.py list
 ```
 
-Download the best one for `ored50m`:
+A 250M checkpoint has not been published yet. Skip this step until one is uploaded. Then download it with:
 
 ```
-python scripts/checkpoints.py pull checkpoints/ored50m/best.pt --kind best --run-name ored50m
+python scripts/checkpoints.py pull checkpoints/ored250m/best.pt --kind best --run-name ored250m
 ```
 
 This only works if ur Supabase already has the checkpoint saved. A new empty project won't have Ored's checkpoint in it.
@@ -163,20 +163,20 @@ U have to get `data/tokenizer.json` separately, it doesn't download by itself. A
 
 ## 9. Train
 
-Run this from the `ored/model` folder once everything above is done:
+Run this from the `ored/model` folder for a fresh 250M training run:
 
 ```
-python scripts/pretrain.py --resume --set training.device=cuda --set data.tokens.dataset_name=ored-data --set data.tokens.dataset_version=v1 --set data.tokens.tokenizer=data/tokenizer.json
+python scripts/pretrain.py --set training.device=cuda --set data.tokens.dataset_name=ored-data --set data.tokens.dataset_version=v1 --set data.tokens.tokenizer=data/tokenizer.json
 ```
 
-`--resume` means it continues from the best checkpoint u downloaded. If something is missing or doesn't match (checkpoint, dataset, tokenizer or keys), it will just stop with an error.
+Add `--resume` only when continuing an existing 250M run. If something is missing or doesn't match (dataset, tokenizer or keys), it will stop with an error.
 
 ## 10. Save the checkpoint
 
 When training is done, upload ur best checkpoint:
 
 ```
-python scripts/checkpoints.py push checkpoints/ored50m/best.pt --kind best --run-name ored50m
+python scripts/checkpoints.py push checkpoints/ored250m/best.pt --kind best --run-name ored250m
 ```
 
 Check it got saved:

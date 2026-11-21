@@ -18,7 +18,7 @@ from ored.utils.seed import resolve_device
 
 logger = get_logger(__name__)
 
-DEFAULT_CHECKPOINT = "checkpoints/ored50m/best.pt"
+DEFAULT_CHECKPOINT = "checkpoints/ored250m/best.pt"
 
 PREDICTOR_REGISTRY: dict[str, type[BasePredictor]] = {}
 

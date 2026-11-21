@@ -722,9 +722,9 @@ def probe_batch_sizes(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Pretrain the ~50M Ored model on token shards."
+        description="Pretrain the ~250M Ored model on token shards."
     )
-    parser.add_argument("--config", default="configs/ored50m.yaml")
+    parser.add_argument("--config", default="configs/ored250m.yaml")
     parser.add_argument(
         "--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE"
     )
@@ -744,7 +744,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--init-from",
         metavar="BEST_PT",
-        help="start a new run from an ored50m best.pt's weights (e.g. on a new dataset version)",
+        help="start a new run from an ored250m best.pt's weights (e.g. on a new dataset version)",
     )
     parser.add_argument("--run-name")
     args = parser.parse_args(argv)
