@@ -256,6 +256,10 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
     <td align="center"><b>Edu web</b> (Hugging face)</td>
     <td>Training data collection</td>
   </tr>
+ <tr>
+    <td align="center"><b>Magnific</b> (Hugging face)</td>
+    <td>Website innovative ideas</td>
+  </tr>
 </table>
 
 </div>
