@@ -180,6 +180,6 @@ body {
   font-family: Arial, sans-serif;
 }
 
-.banner-2 h2 { margin: 0 8% 4%; font-size: clamp(24px, 4vw, 54px); }
-.banner-2 strong { display: block; padding: 2% 8%; background: #d6ed17; }
+.banner-2 h2 { margin: 0 8% 4%; font-size: clamp(24px, 4vw, 54px); }.banner-2 strong { display: block; padding: 2% 8%; background: #606060; color: #fcf6f5; }
+.banner-2 button { margin: 4% 8%; background: #d6ed17; color: #606060; }
 
