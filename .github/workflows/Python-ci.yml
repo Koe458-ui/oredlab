@@ -80,5 +80,5 @@ jobs:
         run: python -m compileall -q -x '(\.venv|venv|\.git|node_modules)' .
 
       - name: Run tests with coverage
-        run: |
-          pytest ored/model/tests --cov=ored --cov-report=term-missing
+        working-directory: ored/model
+        run: pytest --cov=ored --cov-report=term-missing
