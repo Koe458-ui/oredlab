@@ -1,1 +1,73 @@
+<!-- y2k retro style website design -->
+<!-- and design was inspierd from awwwards website -->
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synthwave Background</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<svg id="bg" viewBox="0 0 1050 700" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+  <defs>
+    <linearGradient id="gMoon" gradientUnits="userSpaceOnUse" x1="0" y1="128" x2="0" y2="240">
+      <stop offset="0" stop-color="#f8a89c"/>
+      <stop offset="0.5" stop-color="#ee7db8"/>
+      <stop offset="1" stop-color="#b95fa5"/>
+    </linearGradient>
+    <linearGradient id="gSun" gradientUnits="userSpaceOnUse" x1="0" y1="88" x2="0" y2="520">
+      <stop offset="0" stop-color="#c65fa0"/>
+      <stop offset="0.25" stop-color="#d33d9a"/>
+      <stop offset="0.5" stop-color="#d03a96"/>
+      <stop offset="0.72" stop-color="#95308a"/>
+      <stop offset="1" stop-color="#5c2e8e"/>
+    </linearGradient>
+    <linearGradient id="gFloor" gradientUnits="userSpaceOnUse" x1="0" y1="475" x2="0" y2="700">
+      <stop offset="0" stop-color="#432f93"/>
+      <stop offset="0.5" stop-color="#692d8d"/>
+      <stop offset="1" stop-color="#85287f"/>
+    </linearGradient>
+    <clipPath id="sunClip">
+      <circle cx="526" cy="304" r="216"/>
+    </clipPath>
+  </defs>
+
+  <rect x="-4000" y="-4000" width="9000" height="4475" fill="#2b3490"/>
+
+  <g fill="#fff">
+    <circle class="star" cx="186" cy="23" r="1.6"/>
+    <circle class="star" cx="115" cy="149" r="1.6"/>
+    <circle class="star" cx="56" cy="191" r="1.6"/>
+  </g>
+
+  <g id="stars" fill="#fff"></g>
+
+  <circle cx="217" cy="184" r="56" fill="url(#gMoon)"/>
+
+  <g clip-path="url(#sunClip)">
+    <rect x="300" y="80" width="450" height="440" fill="url(#gSun)"/>
+    <g fill="#43338f">
+      <rect x="300" y="266" width="450" height="8"/>
+      <rect x="300" y="311" width="450" height="8"/>
+      <rect x="300" y="347" width="450" height="20"/>
+      <rect x="300" y="388" width="450" height="22"/>
+      <rect x="300" y="418" width="450" height="22"/>
+      <rect x="300" y="446" width="450" height="14"/>
+      <rect x="300" y="470" width="450" height="12"/>
+    </g>
+  </g>
+
+  <rect x="-4000" y="475" width="9000" height="1500" fill="url(#gFloor)"/>
+  <rect x="-4000" y="700" width="9000" height="1500" fill="#85287f"/>
+
+  <path id="rowsC" fill="none" stroke="#3aa0dc" stroke-width="1.2" stroke-opacity="0.6"/>
+  <path id="rowsW" fill="none" stroke="#fff" stroke-width="1.6"/>
+  <path id="cols" fill="none" stroke="#fff" stroke-width="1.8"/>
+</svg>
+
+<script src="script.js"></script>
+</body>
+</html>
