@@ -160,11 +160,11 @@ def ensure_snapshot(cfg: Config, env: DistEnv) -> Any:
 def ensure_data(cfg: Config, env: DistEnv) -> Any:
     if cfg.data.source == "supabase":
         return ensure_snapshot(cfg, env)
-    if env.local_rank == 0:
-        if not (Path(cfg.data.corpus.dir) / "train.txt").exists():
-            from ored.data.corpus import generate_corpus
+    corpus_path = Path(cfg.data.corpus.dir) / "train.txt"
+    if env.local_rank == 0 and not corpus_path.exists():
+        from ored.data.corpus import generate_corpus
 
-            generate_corpus(cfg)
+        generate_corpus(cfg)
     env.barrier()
 
 

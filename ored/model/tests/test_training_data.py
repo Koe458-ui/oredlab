@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
+import test_inference
 import torch
 from ored.config import load_config
 from ored.data.snapshot import (
@@ -39,7 +40,6 @@ from ored.training.trainer import main as train_main
 from ored.training.trainer import train
 from ored.utils.checkpoint import load_checkpoint
 from test_checkpoint_store import FakeBucket
-import test_inference
 
 trained_lm_checkpoint = test_inference.trained_lm_checkpoint
 

@@ -8,6 +8,8 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
+import test_online
+import test_training_data
 import torch
 from ored.config import load_config
 from ored.data.snapshot import (
@@ -20,13 +22,11 @@ from ored.data.training_data import Selection
 from ored.distributed.checkpoint import safe_file_name
 from ored.learning import InMemoryStore
 from ored.learning.candidates import redact
-from ored.learning.online import OnlineLearner, OnlinePolicy, OnlineResult
+from ored.learning.online import OnlineResult
 from ored.learning.supabase_store import SupabaseStore
 from ored.serving.server import InsecureServerError, OredHandler, check_exposure
 from ored.training.trainer import main as train_main
 from test_checkpoint_store import FakeBucket
-import test_online
-import test_training_data
 from test_training_data import CONFIG, row, synthetic_rows
 
 learner = test_online.learner

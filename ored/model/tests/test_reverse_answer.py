@@ -55,7 +55,7 @@ def test_score_text_grades_reversed_sums(tiny_corpus):
         "verbs_plural": ["see"],
         "templates": ["the {adj} {noun} {verb_s} {name} ."],
     }
-    text = "\n".join(["", "13 + 8 = 12", "5 + 4 = 9", "13 + 8 = 21", ""])
+    text = "\n13 + 8 = 12\n5 + 4 = 9\n13 + 8 = 21\n"
 
     quality = score_text(text, grammar, reverse_answer=True)
     assert quality.arithmetic_lines == 3

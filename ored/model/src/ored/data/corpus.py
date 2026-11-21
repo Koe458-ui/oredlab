@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-
 from ored.config import Config, load_config
 from ored.utils.logging_utils import get_logger, section
 
@@ -2793,8 +2792,8 @@ def split_pairs(
     rng.shuffle(pairs)
 
     n_total = len(pairs)
-    n_train = int(round(train_frac * n_total))
-    n_val = int(round(val_frac * n_total))
+    n_train = round(train_frac * n_total)
+    n_val = round(val_frac * n_total)
     if n_total - n_train - n_val <= 0:
         raise ValueError("pair split leaves no pairs for the test corpus")
 

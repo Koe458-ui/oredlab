@@ -8,7 +8,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-
 import yaml
 
 from ored.config import Config, load_config
@@ -144,7 +143,7 @@ def fact_lines(spec: FactSpec, repeats: int, rng: random.Random) -> list[str]:
 
 
 def repeats_by_split(repeats: int, val_test_fraction: float) -> dict[str, int]:
-    smaller = max(1, int(round(repeats * val_test_fraction)))
+    smaller = max(1, round(repeats * val_test_fraction))
     return {"train": repeats, "val": smaller, "test": smaller}
 
 

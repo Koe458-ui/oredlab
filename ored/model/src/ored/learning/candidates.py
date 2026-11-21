@@ -5,7 +5,6 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-
 from ored.learning.records import LearningCandidate, Message, Role
 
 EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")

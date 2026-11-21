@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
 from ored.data.facts import TERMINATORS
 from ored.inference.predictor import LanguageModelPredictor, load_predictor
 from ored.utils.logging_utils import get_logger, section

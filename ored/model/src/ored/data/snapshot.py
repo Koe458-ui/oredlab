@@ -713,14 +713,20 @@ def describe_snapshot(prepared: PreparedDataset) -> list[str]:
         )
         + (f", {len(m['skipped'])} invalid left out" if m["skipped"] else "")
         + ("" if prepared.built else f"  [snapshot reused, taken {m['created_at']}]"),
-        f"rows trained  : {counts['records']:,}  train {counts['train']:,} / val {counts['val']:,} / "
-        f"test {counts['test']:,}  (seed {m['split']['seed']})",
-        f"groups        : train {m['split']['groups']['train']:,} / val {m['split']['groups']['val']:,} / "
-        f"test {m['split']['groups']['test']:,}  (a group never crosses splits)",
+        (
+            f"rows trained  : {counts['records']:,}  train {counts['train']:,} / val {counts['val']:,} / "
+            f"test {counts['test']:,}  (seed {m['split']['seed']})"
+        ),
+        (
+            f"groups        : train {m['split']['groups']['train']:,} / val {m['split']['groups']['val']:,} / "
+            f"test {m['split']['groups']['test']:,}  (a group never crosses splits)"
+        ),
         f"types         : {', '.join(f'{k} {v}' for k, v in counts['by_type'].items())}",
         f"categories    : {', '.join(f'{k} {v}' for k, v in counts['by_category'].items())}",
-        f"tokenizer     : {m['tokenizer']['name']}, {m['tokenizer']['vocab_size']} symbols "
-        f"(sha256 {m['tokenizer']['sha256'][:16]})",
+        (
+            f"tokenizer     : {m['tokenizer']['name']}, {m['tokenizer']['vocab_size']} symbols "
+            f"(sha256 {m['tokenizer']['sha256'][:16]})"
+        ),
     ]
     if m["skipped"]:
         lines.append(

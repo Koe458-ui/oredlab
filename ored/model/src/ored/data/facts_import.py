@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 import yaml
 
 from ored.data.training_data import normalise_fields

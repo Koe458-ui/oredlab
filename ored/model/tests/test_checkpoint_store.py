@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import torch
 from ored.learning import (
@@ -533,9 +535,7 @@ def _row(
         promotion_metric="val_loss",
         promotion_mode="min",
     )
-    return store.register_checkpoint(
-        record, make_current=current, replaces=None
-    )
+    return store.register_checkpoint(record, make_current=current, replaces=None)
 
 
 def test_duplicates_are_reported_not_deleted(env):

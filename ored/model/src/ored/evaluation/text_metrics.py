@@ -5,7 +5,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 
-
 def build_template_patterns(grammar: dict[str, Sequence[str]]) -> list[re.Pattern]:
     slots = {
         "adj": grammar["adjectives"],

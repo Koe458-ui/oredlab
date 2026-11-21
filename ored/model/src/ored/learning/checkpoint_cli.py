@@ -112,8 +112,10 @@ def card(record: Checkpoint, report: Any = None) -> str:
         f"Derived from:    {record.parent_checkpoint_id or '-'}",
         *(
             [
-                f"Distributed:     {record.world_size} workers, group {record.checkpoint_group_id} "
-                f"({'complete' if record.is_complete else 'INCOMPLETE'})"
+                (
+                    f"Distributed:     {record.world_size} workers, group {record.checkpoint_group_id} "
+                    f"({'complete' if record.is_complete else 'INCOMPLETE'})"
+                )
             ]
             if record.part is not CheckpointPart.FILE
             else []
@@ -160,8 +162,10 @@ def local_card(path: Path) -> str:
             f"BPC:             {_num(_metric(m, 'val_bpc'))}",
             f"PPL:             {_num(_metric(m, 'val_ppl'))}",
             f"Train loss:      {_num(_metric(m, 'train_loss'))}",
-            f"Best so far:     {promotion.get('metric', '-')} {_num(promotion.get('value'))} "
-            f"(epoch {promotion.get('epoch', '-')})",
+            (
+                f"Best so far:     {promotion.get('metric', '-')} {_num(promotion.get('value'))} "
+                f"(epoch {promotion.get('epoch', '-')})"
+            ),
             f"Resumable:       {'YES' if resumable else 'NO'}",
             "",
             f"Size:            {_mb(path.stat().st_size)}",

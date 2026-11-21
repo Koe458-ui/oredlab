@@ -117,7 +117,9 @@ def _decompress(path: Path, kind: str) -> Path:
             ) from exc
         source = io.BufferedReader(
             zstandard.ZstdDecompressor().stream_reader(
-                open(path, "rb"), read_across_frames=True, closefd=True  # noqa: SIM115 -- the owning stream or writer closes this handle
+                open(path, "rb"),
+                read_across_frames=True,
+                closefd=True,  # noqa: SIM115 -- the owning stream or writer closes this handle
             )
         )
     with source, open(part, "wb") as out:

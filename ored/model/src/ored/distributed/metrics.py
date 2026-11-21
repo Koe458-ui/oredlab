@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 
-
 from ored.distributed.env import DistEnv
 from ored.training.metrics import MetricAccumulator
 

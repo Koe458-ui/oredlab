@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import json
 import re
 from collections import Counter, defaultdict
@@ -180,7 +181,7 @@ class SubwordTokenizer(Tokenizer):
         seen_bytes: Iterable[int] = range(256),
         special_tokens: Sequence[str] = (),
     ) -> None:
-        self.seen_bytes: list[int] = sorted(set(int(b) for b in seen_bytes))
+        self.seen_bytes: list[int] = sorted({int(b) for b in seen_bytes})
         self._seen = set(self.seen_bytes)
         self.merges: list[tuple[str, str]] = [(a, b) for a, b in merges]
         self.special_tokens: list[str] = list(special_tokens)
@@ -342,7 +343,7 @@ def learn_merges(words: Counter, n_merges: int) -> list[tuple[str, str]]:
     pairs: Counter = Counter()
     where: dict[tuple[str, str], set] = defaultdict(set)
     for i, pieces in enumerate(vocab):
-        for pair in zip(pieces, pieces[1:]):
+        for pair in itertools.pairwise(pieces):
             pairs[pair] += counts[i]
             where[pair].add(i)
 
@@ -355,7 +356,7 @@ def learn_merges(words: Counter, n_merges: int) -> list[tuple[str, str]]:
         merges.append(pair)
         for i in sorted(where.pop(pair, ())):
             pieces, n = vocab[i], counts[i]
-            for old in zip(pieces, pieces[1:]):
+            for old in itertools.pairwise(pieces):
                 pairs[old] -= n
                 if pairs[old] <= 0:
                     del pairs[old]
@@ -369,7 +370,7 @@ def learn_merges(words: Counter, n_merges: int) -> list[tuple[str, str]]:
                     merged.append(pieces[j])
                     j += 1
             vocab[i] = merged
-            for new in zip(merged, merged[1:]):
+            for new in itertools.pairwise(merged):
                 pairs[new] += n
                 where[new].add(i)
         pairs.pop(pair, None)

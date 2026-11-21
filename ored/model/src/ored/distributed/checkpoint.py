@@ -946,14 +946,10 @@ class DistributedCheckpointManager(CheckpointManager):
     def _ensure_local(self, info: dict[str, Any], directory: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)
         manifest_path = directory / MANIFEST
-        if info.get("remote"):
-            if (
-                not manifest_path.is_file()
-                or digest(manifest_path) != info["manifest_sha"]
-            ):
-                self._download(
-                    info["manifest_object"], manifest_path, info["manifest_sha"]
-                )
+        if info.get("remote") and (
+            not manifest_path.is_file() or digest(manifest_path) != info["manifest_sha"]
+        ):
+            self._download(info["manifest_object"], manifest_path, info["manifest_sha"])
         manifest = read_manifest(directory)
         missing = []
         for entry in manifest["shards"]:

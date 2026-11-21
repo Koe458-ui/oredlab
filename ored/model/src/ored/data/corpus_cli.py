@@ -6,7 +6,6 @@ import sys
 from collections.abc import Iterator
 from pathlib import Path
 
-
 from ored.data.readers import detect_format, file_sha256, inspect_file, open_reader
 
 RAW_SUFFIXES = (

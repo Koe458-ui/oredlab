@@ -745,9 +745,7 @@ class Selection:
             return False
         if self.languages and record.language not in self.languages:
             return False
-        if self.as_of is not None and str(record.updated_at) > self.as_of:
-            return False
-        return True
+        return not (self.as_of is not None and str(record.updated_at) > self.as_of)
 
     def describe(self) -> str:
         rules = []

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 
-
 from ored.data.corpus import format_answer, load_arithmetic_pairs
 from ored.evaluation.lm_evaluator import load_language_model
 from ored.inference.generator import complete, generate_text

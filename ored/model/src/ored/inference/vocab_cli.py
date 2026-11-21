@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-
 from ored.data.tokenizer import Tokenizer
 from ored.inference.predictor import read_tokenizer, resolve_checkpoint
 from ored.utils.checkpoint import load_for_inference

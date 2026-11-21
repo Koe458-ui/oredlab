@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 
-
 from ored.evaluation.lm_evaluator import evaluate_language_model
 from ored.inference.predictor import DEFAULT_CHECKPOINT
 

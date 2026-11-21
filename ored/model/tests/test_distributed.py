@@ -130,9 +130,9 @@ def test_every_worker_gets_its_own_share_of_the_data(cfg, tmp_path):
     ), "shards overlap beyond DistributedSampler's padding"
     assert set().union(*train) == set(range(len_train(cfg)))
     val = [r["val_indices"] for r in ranks]
-    assert sorted(index for indices in val for index in indices) == list(range(sum(len(v) for v in val))), (
-        "validation must be split exactly"
-    )
+    assert sorted(index for indices in val for index in indices) == list(
+        range(sum(len(v) for v in val))
+    ), "validation must be split exactly"
     assert not set(val[0]) & set(val[1])
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -407,7 +408,7 @@ class Trainer:
             self.history.append(record)
 
             improved = self.checkpoints.evaluate_and_promote_best(
-                record, epoch, lambda record=record: self.snapshot(record)
+                record, epoch, partial(self.snapshot, record)
             )
             if improved:
                 self.best_val_loss = val_metrics["loss"]
@@ -603,12 +604,11 @@ def train(cfg: Config, ensure_dataset: bool = True) -> dict[str, Any]:
             "data.source is generated: this run does NOT read ored_training_data "
             "(remove --generated-corpus / data.source=generated to train on Supabase data)"
         )
-    if ensure_dataset:
-        if not (Path(cfg.data.corpus.dir) / "train.txt").exists():
-            from ored.data.corpus import generate_corpus
+    if ensure_dataset and not (Path(cfg.data.corpus.dir) / "train.txt").exists():
+        from ored.data.corpus import generate_corpus
 
-            logger.info("corpus missing -- generating it first")
-            generate_corpus(cfg)
+        logger.info("corpus missing -- generating it first")
+        generate_corpus(cfg)
     return Trainer(cfg).fit()
 
 

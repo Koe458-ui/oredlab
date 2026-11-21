@@ -5,7 +5,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-
 from ored.learning.records import TrainingExample
 from ored.learning.store import LearningStore
 
@@ -53,7 +52,7 @@ def _split(
     examples: Sequence[TrainingExample], val_fraction: float
 ) -> dict[str, list[TrainingExample]]:
     ordered = sorted(examples, key=lambda e: e.id)
-    cut = max(1, int(round(len(ordered) * (1.0 - val_fraction))))
+    cut = max(1, round(len(ordered) * (1.0 - val_fraction)))
     return {"train": ordered[:cut], "val": ordered[cut:]}
 
 

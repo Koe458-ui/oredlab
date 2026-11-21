@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import ClassVar
 import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import ClassVar
 from xml.sax.saxutils import escape
 
 import pytest
