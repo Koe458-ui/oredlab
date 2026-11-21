@@ -5,6 +5,7 @@ import io
 import shutil
 import tempfile
 from collections.abc import Callable
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -106,24 +107,23 @@ def inspect_object(
 def _decompress(path: Path, kind: str) -> Path:
     target = path.with_suffix("")
     part = target.with_name(target.name + ".part")
-    if kind == "gzip":
-        source = io.BufferedReader(gzip.open(path, "rb"))  # noqa: SIM115 -- the owning stream or writer closes this handle
-    else:
-        try:
-            import zstandard
-        except ImportError as exc:
-            raise ReaderError(
-                f"{path.name} is zstd-compressed: pip install zstandard"
-            ) from exc
-        source = io.BufferedReader(
-            zstandard.ZstdDecompressor().stream_reader(
-                open(path, "rb"),
-                read_across_frames=True,
-                closefd=True,  # noqa: SIM115 -- the owning stream or writer closes this handle
+    with ExitStack() as stack:
+        raw = stack.enter_context(path.open("rb"))
+        if kind == "gzip":
+            source = stack.enter_context(gzip.GzipFile(fileobj=raw, mode="rb"))
+        else:
+            try:
+                import zstandard
+            except ImportError as exc:
+                raise ReaderError(
+                    f"{path.name} is zstd-compressed: pip install zstandard"
+                ) from exc
+            reader = zstandard.ZstdDecompressor().stream_reader(
+                raw, read_across_frames=True, closefd=False
             )
-        )
-    with source, open(part, "wb") as out:
-        shutil.copyfileobj(source, out, 4 * 1024 * 1024)
+            source = stack.enter_context(reader)
+        with part.open("wb") as out:
+            shutil.copyfileobj(source, out, 4 * 1024 * 1024)
     part.replace(target)
     path.unlink()
     return target
