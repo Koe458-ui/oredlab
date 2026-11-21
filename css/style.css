@@ -189,3 +189,12 @@ body {
 .banner-2 h2 { margin: 0 8% 4%; font-size: clamp(24px, 4vw, 54px); }.banner-2 strong { display: block; padding: 2% 8%; background: #606060; color: #fcf6f5; }
 .banner-2 button { margin: 4% 8%; background: #d6ed17; color: #606060; }
 
+.side-text {
+  position: absolute;
+  left: 3vw;
+  bottom: calc(min(18.1vw, 32.2vh) + 12px);
+  margin: 0;
+  font: 900 min(2.4vw, 28px)/1 Arial, sans-serif;
+  -webkit-text-stroke-width: .035em;
+}
+
