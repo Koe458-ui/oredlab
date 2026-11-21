@@ -198,3 +198,233 @@ body {
   -webkit-text-stroke-width: .035em;
 }
 
+.tape {
+  --shadow: #00d1b2;
+  --body: #fff7e6;
+  --label: #ff7a3d;
+  --label-dark: #e8622a;
+  --reel: #5b4bff;
+  --strip: #ffd23f;
+  --dot: #ffd23f;
+  --ink: #1b1f3b;
+
+  position: relative;
+  z-index: 2;
+  width: 320px;
+  height: 205px;
+  background: var(--body);
+  border-radius: 12px;
+  border: 4px solid var(--shadow);
+  box-shadow: 8px 8px 0 var(--shadow);
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+  50% { transform: translateY(-6px); }
+}
+
+.tape::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 20px;
+  width: 90px;
+  height: 6px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.8);
+}
+
+.screw {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  background: var(--reel);
+  border-radius: 50%;
+}
+
+.screw::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  background: var(--body);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.s1 { top: 7px; left: 7px; }
+.s2 { top: 7px; right: 7px; }
+.s3 { bottom: 7px; left: 7px; }
+.s4 { bottom: 7px; right: 7px; }
+
+.label {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  height: 118px;
+  background: var(--label);
+  border-radius: 10px;
+  box-shadow: inset 0 -6px 0 var(--label-dark);
+}
+
+.label-top {
+  position: absolute;
+  top: 8px;
+  left: 16px;
+  right: 16px;
+  height: 20px;
+  background: var(--body);
+  border-radius: 4px;
+  font: 700 11px/20px "Courier New", monospace;
+  color: var(--ink);
+  padding-left: 8px;
+  letter-spacing: 1px;
+}
+
+.label-top span {
+  float: right;
+  margin-right: 8px;
+  color: var(--label-dark);
+}
+
+.lines {
+  position: absolute;
+  bottom: 8px;
+  left: 16px;
+  right: 16px;
+  height: 10px;
+  border-top: 2px solid rgba(255,247,230,.7);
+  border-bottom: 2px solid rgba(255,247,230,.7);
+}
+
+.window {
+  position: absolute;
+  top: 38px;
+  left: 54px;
+  right: 54px;
+  height: 70px;
+  background: var(--body);
+  border-radius: 8px;
+  border: 2px solid var(--shadow);
+}
+
+.tape-line {
+  position: absolute;
+  top: 30px;
+  left: 40px;
+  right: 40px;
+  height: 10px;
+  background: var(--ink);
+  opacity: .12;
+}
+
+.reel {
+  position: absolute;
+  top: 14px;
+  width: 38px;
+  height: 38px;
+  background: var(--reel);
+  border-radius: 50%;
+  animation: spin 3s linear infinite;
+}
+
+.reel::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 2px dotted var(--body);
+}
+
+.reel::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--body);
+  box-shadow: 0 0 0 3px var(--ink);
+}
+
+.reel.l { left: 10px; }
+.reel.r { right: 10px; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.strip {
+  position: absolute;
+  top: 21px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 62px;
+  height: 22px;
+  background: var(--strip);
+  border: 2px solid var(--shadow);
+}
+
+.strip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  background: var(--ink);
+  opacity: .4;
+}
+
+.base {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 190px;
+  height: 58px;
+  background: var(--shadow);
+  clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+}
+
+.base::before {
+  content: "";
+  position: absolute;
+  inset: 2px 2px 0 2px;
+  background: var(--body);
+  clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+}
+
+.dot {
+  position: absolute;
+  z-index: 1;
+  background: var(--dot);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--shadow);
+}
+
+.d1 { width: 14px; height: 14px; left: 60px; bottom: 12px; }
+.d2 { width: 9px; height: 9px; left: 90px; bottom: 30px; }
+.d3 { width: 9px; height: 9px; left: 142px; bottom: 36px; }
+.d4 { width: 9px; height: 9px; right: 80px; bottom: 30px; }
+.d5 { width: 14px; height: 14px; right: 60px; bottom: 12px; }
+
+.side {
+  position: absolute;
+  bottom: 10px;
+  width: 6px;
+  height: 24px;
+  background: var(--label);
+  border-radius: 3px;
+}
+
+.side.l { left: 26px; }
+.side.r { right: 26px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tape, .reel { animation: none; }
+}
