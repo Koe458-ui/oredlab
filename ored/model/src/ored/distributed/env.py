@@ -7,7 +7,7 @@ import platform
 import socket
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any, Dict, List
+from typing import Any
 
 import torch
 import torch.distributed as dist
@@ -17,7 +17,14 @@ from ored.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
-TORCHRUN_VARIABLES = ("RANK", "LOCAL_RANK", "WORLD_SIZE", "LOCAL_WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT")
+TORCHRUN_VARIABLES = (
+    "RANK",
+    "LOCAL_RANK",
+    "WORLD_SIZE",
+    "LOCAL_WORLD_SIZE",
+    "MASTER_ADDR",
+    "MASTER_PORT",
+)
 
 
 class DistributedError(RuntimeError):
@@ -41,7 +48,6 @@ def session_key_from_environ(explicit: str = "") -> str:
 
 @dataclass
 class DistEnv:
-
     rank: int
     local_rank: int
     world_size: int
@@ -59,7 +65,9 @@ class DistEnv:
     device: torch.device = field(default_factory=lambda: torch.device("cpu"))
 
     @classmethod
-    def from_environ(cls, settings: DistributedConfig, session_key: str = "") -> "DistEnv":
+    def from_environ(
+        cls, settings: DistributedConfig, session_key: str = ""
+    ) -> DistEnv:
         missing = [name for name in TORCHRUN_VARIABLES if name not in os.environ]
         if missing:
             raise DistributedError(
@@ -96,9 +104,13 @@ class DistEnv:
     def select_device(self, requested: str) -> torch.device:
         use_cuda = requested != "cpu" and torch.cuda.is_available()
         if requested == "cuda" and not torch.cuda.is_available():
-            raise DistributedError(f"rank {self.rank} on {self.hostname}: training.device is cuda but no CUDA GPU is visible")
+            raise DistributedError(
+                f"rank {self.rank} on {self.hostname}: training.device is cuda but no CUDA GPU is visible"
+            )
         if self.backend == "nccl" and not use_cuda:
-            raise DistributedError(f"rank {self.rank} on {self.hostname}: the nccl backend needs a CUDA GPU; use backend gloo")
+            raise DistributedError(
+                f"rank {self.rank} on {self.hostname}: the nccl backend needs a CUDA GPU; use backend gloo"
+            )
         if use_cuda:
             if self.local_rank >= torch.cuda.device_count():
                 raise DistributedError(
@@ -118,7 +130,9 @@ class DistEnv:
                 f"Set distributed.backend: gloo on every machine."
             )
         if not dist.is_initialized():
-            dist.init_process_group(backend=self.backend, timeout=timedelta(seconds=self.timeout_seconds))
+            dist.init_process_group(
+                backend=self.backend, timeout=timedelta(seconds=self.timeout_seconds)
+            )
         if dist.get_rank() != self.rank or dist.get_world_size() != self.world_size:
             raise DistributedError("RANK / WORLD_SIZE do not match the process group")
 
@@ -137,18 +151,22 @@ class DistEnv:
         dist.broadcast_object_list(box, src=0, device=self.comm_device)
         return box[0]
 
-    def all_gather_object(self, value: Any) -> List[Any]:
-        gathered: List[Any] = [None] * self.world_size
+    def all_gather_object(self, value: Any) -> list[Any]:
+        gathered: list[Any] = [None] * self.world_size
         dist.all_gather_object(gathered, value)
         return gathered
 
-    def all_reduce_sum(self, values: List[float]) -> List[float]:
+    def all_reduce_sum(self, values: list[float]) -> list[float]:
         tensor = torch.tensor(values, dtype=torch.float64, device=self.comm_device)
         dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
         return tensor.cpu().tolist()
 
-    def describe(self) -> Dict[str, Any]:
-        gpu = torch.cuda.get_device_name(self.device) if self.device.type == "cuda" else ""
+    def describe(self) -> dict[str, Any]:
+        gpu = (
+            torch.cuda.get_device_name(self.device)
+            if self.device.type == "cuda"
+            else ""
+        )
         return {
             "rank": self.rank,
             "local_rank": self.local_rank,
@@ -170,14 +188,20 @@ class DistEnv:
 
 def config_fingerprint(cfg: Config) -> str:
     data = cfg.to_dict()
-    data["training"] = {k: v for k, v in data["training"].items() if k not in ("resume", "device")}
+    data["training"] = {
+        k: v for k, v in data["training"].items() if k not in ("resume", "device")
+    }
     data.pop("paths", None)
     data["checkpoint"] = {k: v for k, v in data["checkpoint"].items() if k != "upload"}
-    data["distributed"] = {k: v for k, v in data["distributed"].items() if k != "report_to_supabase"}
-    return hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()[:16]
+    data["distributed"] = {
+        k: v for k, v in data["distributed"].items() if k != "report_to_supabase"
+    }
+    return hashlib.sha256(
+        json.dumps(data, sort_keys=True, default=str).encode()
+    ).hexdigest()[:16]
 
 
-def check_membership(env: DistEnv, cfg: Config, data_signature: Dict[str, Any]) -> None:
+def check_membership(env: DistEnv, cfg: Config, data_signature: dict[str, Any]) -> None:
     mine = {
         "rank": env.rank,
         "host": env.hostname,
@@ -190,11 +214,18 @@ def check_membership(env: DistEnv, cfg: Config, data_signature: Dict[str, Any]) 
     }
     everyone = env.all_gather_object(mine)
     problems = []
-    for key, label in (("session", "session"), ("run_name", "run_name"), ("config", "config"),
-                       ("data", "training data"), ("backend", "backend")):
+    for key, label in (
+        ("session", "session"),
+        ("run_name", "run_name"),
+        ("config", "config"),
+        ("data", "training data"),
+        ("backend", "backend"),
+    ):
         values = {json.dumps(p[key], sort_keys=True) for p in everyone}
         if len(values) > 1:
-            detail = ", ".join(f"rank {p['rank']} ({p['host']}): {p[key]}" for p in everyone)
+            detail = ", ".join(
+                f"rank {p['rank']} ({p['host']}): {p[key]}" for p in everyone
+            )
             problems.append(f"workers disagree on {label}: {detail}")
     if problems:
         raise DistributedError(

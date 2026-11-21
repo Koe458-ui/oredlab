@@ -26,9 +26,12 @@ def test_scanner_catches_real_shaped_keys(tmp_path, monkeypatch):
         "ORED_SB_SERVICE_KEY=sb_secret_" + "a1B2" * 8 + "\n"
         "ORED_R2_SECRET_ACCESS_KEY=" + "0f" * 32 + "\n"
         "set ORED_R2_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY\n"
-        "ORED_AUTH_KEY: sb_publishable_" + "x" * 30 + "\n")
+        "ORED_AUTH_KEY: sb_publishable_" + "x" * 30 + "\n"
+    )
     (tmp_path / ".env").write_text("A=1\n")
     problems = scanner.scan(["leak.txt", ".env"])
-    assert any("leak.txt:1" in p for p in problems) and any("leak.txt:2" in p for p in problems)
+    assert any("leak.txt:1" in p for p in problems) and any(
+        "leak.txt:2" in p for p in problems
+    )
     assert not any("leak.txt:3" in p or "leak.txt:4" in p for p in problems)
     assert any(p.startswith(".env:") for p in problems)

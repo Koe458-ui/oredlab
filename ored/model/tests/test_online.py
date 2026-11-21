@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 import torch
-
 from ored.data.tokenizer import build_tokenizer
 from ored.learning.online import OnlineLearner, OnlinePolicy
 from ored.models.registry import build_model
@@ -92,13 +91,21 @@ def test_the_policy_rejects_nonsense():
         OnlinePolicy(steps_per_message=0).validate()
 
 
-@pytest.mark.parametrize("module", ["ored.learning.online", "ored.serving.server", "ored.inference.vocab_cli"])
+@pytest.mark.parametrize(
+    "module",
+    ["ored.learning.online", "ored.serving.server", "ored.inference.vocab_cli"],
+)
 def test_the_module_imports_on_its_own(module):
     import subprocess
     import sys
     from pathlib import Path
 
     src = Path(__file__).resolve().parent.parent / "src"
-    result = subprocess.run([sys.executable, "-c", f"import {module}"], capture_output=True,
-                            text=True, env={"PYTHONPATH": str(src), "PATH": ""})
+    result = subprocess.run(
+        [sys.executable, "-c", f"import {module}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={"PYTHONPATH": str(src), "PATH": ""},
+    )
     assert result.returncode == 0, result.stderr

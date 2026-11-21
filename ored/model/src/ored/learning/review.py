@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Sequence
+from collections.abc import Sequence
 
 from ored.learning.records import (
     CandidateStatus,
@@ -36,7 +36,9 @@ def _move(
         raise ReviewError("a review must name the reviewer")
     allowed = ALLOWED_TRANSITIONS[candidate.status]
     if status not in allowed:
-        raise ReviewError(f"cannot move a candidate from {candidate.status.value} to {status.value}")
+        raise ReviewError(
+            f"cannot move a candidate from {candidate.status.value} to {status.value}"
+        )
     candidate.status = status
     candidate.reviewed_by = reviewer
     candidate.reviewed_at = now()
@@ -94,10 +96,10 @@ def approve_many(
     reviewer: str,
     dataset_tag: str,
     note: str = "",
-) -> List[TrainingExample]:
+) -> list[TrainingExample]:
     return [approve(store, c, reviewer, dataset_tag, note) for c in candidates]
 
 
-def pending(store: LearningStore, limit: Optional[int] = None) -> List[LearningCandidate]:
+def pending(store: LearningStore, limit: int | None = None) -> list[LearningCandidate]:
     found = store.candidates(CandidateStatus.PENDING)
     return found if limit is None else found[:limit]

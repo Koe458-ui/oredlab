@@ -120,7 +120,7 @@ Put your supabase details :
 
 ```
 set "ORED_SB_URL=SUPABASE_URL"
-set "ORED_SB_SERVICE_KEY=SUPABASE_SERVICE_ROLE_KEY"
+set "ORED_SB_SERVICE_KEY=YOUR_SERVICE_KEY"
 ```
 
 ### Checkpoint bucket

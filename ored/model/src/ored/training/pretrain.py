@@ -5,13 +5,14 @@ import inspect
 import json
 import math
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.utils.data import DataLoader, Sampler, Subset
 
 from ored.config import Config, load_config
@@ -26,7 +27,11 @@ from ored.data.tokenizer import Tokenizer
 from ored.data.tokenizer_artifact import load_artifact
 from ored.models.registry import build_model
 from ored.training import gpu
-from ored.training.best_checkpoint import CHECKPOINT_SCHEMA, BestCheckpoint, check_compatible
+from ored.training.best_checkpoint import (
+    CHECKPOINT_SCHEMA,
+    BestCheckpoint,
+    check_compatible,
+)
 from ored.training.schedules import build_schedule
 from ored.utils.logging_utils import get_logger, section
 from ored.utils.seed import resolve_device, set_seed
@@ -47,62 +52,84 @@ class TrainingOOMError(PretrainError):
 @dataclass
 class PretrainData:
     directory: Path
-    manifest: Dict[str, Any]
-    identity: Dict[str, Any]
+    manifest: dict[str, Any]
+    identity: dict[str, Any]
     tokenizer: Tokenizer
-    tokenizer_info: Dict[str, Any]
+    tokenizer_info: dict[str, Any]
     train: TokenWindowDataset
     val: TokenWindowDataset
 
 
-def _dataset_directory(cfg: Config, tokenizer_info: Dict[str, Any]) -> Path:
+def _dataset_directory(cfg: Config, tokenizer_info: dict[str, Any]) -> Path:
     tokens = cfg.data.tokens
     if tokens.manifest:
         path = Path(tokens.manifest)
         return path.parent if path.name == "manifest.json" else path
     if tokens.dataset_name and tokens.dataset_version:
         label = f"{tokenizer_info['name']}-{tokenizer_info['version']}"
-        directory = Path(tokens.cache_dir) / tokens.dataset_name / tokens.dataset_version / label
+        directory = (
+            Path(tokens.cache_dir)
+            / tokens.dataset_name
+            / tokens.dataset_version
+            / label
+        )
         if not (directory / "manifest.json").is_file():
             from ored.storage import ObjectLayout, R2Settings
             from ored.storage.objects import fetch_token_dataset
+
             settings = R2Settings.from_env()
-            object_dir = ObjectLayout(settings.prefix).token_dir(tokens.dataset_name, tokens.dataset_version, label)
-            logger.info(f"fetching r2://{settings.bucket}/{object_dir} into {directory}")
-            fetch_token_dataset(settings.store(), object_dir, directory, tokens.verify, log=logger.info)
+            object_dir = ObjectLayout(settings.prefix).token_dir(
+                tokens.dataset_name, tokens.dataset_version, label
+            )
+            logger.info(
+                f"fetching r2://{settings.bucket}/{object_dir} into {directory}"
+            )
+            fetch_token_dataset(
+                settings.store(), object_dir, directory, tokens.verify, log=logger.info
+            )
         return directory
     raise PretrainError(
         "no training dataset is configured: set data.tokens.manifest (a local shard directory) or "
         "data.tokens.dataset_name + data.tokens.dataset_version (fetched from R2). Build the shards "
-        "first with scripts/corpus.py once the corpus is available.")
+        "first with scripts/corpus.py once the corpus is available."
+    )
 
 
 def prepare_token_data(cfg: Config) -> PretrainData:
     tokens = cfg.data.tokens
     if not tokens.tokenizer:
-        raise PretrainError("data.tokens.tokenizer must name a tokenizer artifact (scripts/corpus.py "
-                            "train-tokenizer writes one); the model never rebuilds its tokenizer")
+        raise PretrainError(
+            "data.tokens.tokenizer must name a tokenizer artifact (scripts/corpus.py "
+            "train-tokenizer writes one); the model never rebuilds its tokenizer"
+        )
     tokenizer, info = load_artifact(tokens.tokenizer)
     if tokenizer.vocab_size != cfg.data.vocab_size:
-        raise PretrainError(f"tokenizer {info['name']} {info['version']} has {tokenizer.vocab_size} tokens, "
-                            f"data.vocab_size is {cfg.data.vocab_size}")
+        raise PretrainError(
+            f"tokenizer {info['name']} {info['version']} has {tokenizer.vocab_size} tokens, "
+            f"data.vocab_size is {cfg.data.vocab_size}"
+        )
     directory = _dataset_directory(cfg, info)
     manifest = load_manifest(directory)
     if manifest["tokenizer"]["sha256"] != info["sha256"]:
-        raise PretrainError(f"{directory} was tokenized with tokenizer {manifest['tokenizer']['sha256'][:16]}, "
-                            f"not {info['sha256'][:16]} ({tokens.tokenizer})")
+        raise PretrainError(
+            f"{directory} was tokenized with tokenizer {manifest['tokenizer']['sha256'][:16]}, "
+            f"not {info['sha256'][:16]} ({tokens.tokenizer})"
+        )
     verify_shards(directory, manifest, tokens.verify, splits=("train", "val"))
-    identity = dataset_identity(manifest, manifest_file_sha256(directory), tokens.dataset_id)
+    identity = dataset_identity(
+        manifest, manifest_file_sha256(directory), tokens.dataset_id
+    )
     block = cfg.data.block_size
     train = TokenWindowDataset(directory, manifest, "train", block, cfg.data.stride)
     val = TokenWindowDataset(directory, manifest, "val", block, block)
     if len(train) == 0 or len(val) == 0:
-        raise PretrainError(f"{directory} has no full {block}-token window in train or val")
+        raise PretrainError(
+            f"{directory} has no full {block}-token window in train or val"
+        )
     return PretrainData(directory, manifest, identity, tokenizer, info, train, val)
 
 
 class EpochSampler(Sampler):
-
     def __init__(self, size: int, seed: int, shuffle: bool) -> None:
         self.size = size
         self.seed = seed
@@ -116,8 +143,11 @@ class EpochSampler(Sampler):
 
     def __iter__(self):
         if self.shuffle:
-            order = torch.randperm(self.size, generator=torch.Generator().manual_seed(self.seed + self.epoch))
-            return iter(order[self.skip:].tolist())
+            order = torch.randperm(
+                self.size,
+                generator=torch.Generator().manual_seed(self.seed + self.epoch),
+            )
+            return iter(order[self.skip :].tolist())
         return iter(range(self.skip, self.size))
 
     def __len__(self) -> int:
@@ -127,42 +157,62 @@ class EpochSampler(Sampler):
 def validation_sample(dataset: TokenWindowDataset, windows: int, seed: int) -> Any:
     if not windows or windows >= len(dataset):
         return dataset
-    chosen = torch.randperm(len(dataset), generator=torch.Generator().manual_seed(seed))[:windows]
+    chosen = torch.randperm(
+        len(dataset), generator=torch.Generator().manual_seed(seed)
+    )[:windows]
     return Subset(dataset, sorted(chosen.tolist()))
 
 
-def build_adamw(model: nn.Module, cfg: Config, device: torch.device) -> torch.optim.Optimizer:
+def build_adamw(
+    model: nn.Module, cfg: Config, device: torch.device
+) -> torch.optim.Optimizer:
     if cfg.training.optimizer.lower() != "adamw":
         raise PretrainError("the pretraining loop uses training.optimizer: adamw")
     decay = [p for p in model.parameters() if p.requires_grad and p.dim() >= 2]
     no_decay = [p for p in model.parameters() if p.requires_grad and p.dim() < 2]
-    groups = [{"params": decay, "weight_decay": cfg.training.weight_decay},
-              {"params": no_decay, "weight_decay": 0.0}]
+    groups = [
+        {"params": decay, "weight_decay": cfg.training.weight_decay},
+        {"params": no_decay, "weight_decay": 0.0},
+    ]
     extra = {}
-    if device.type == "cuda" and "fused" in inspect.signature(torch.optim.AdamW).parameters:
+    if (
+        device.type == "cuda"
+        and "fused" in inspect.signature(torch.optim.AdamW).parameters
+    ):
         extra["fused"] = True
-    return torch.optim.AdamW(groups, lr=cfg.training.learning_rate, betas=(0.9, 0.95), **extra)
+    return torch.optim.AdamW(
+        groups, lr=cfg.training.learning_rate, betas=(0.9, 0.95), **extra
+    )
 
 
 def check_parameter_count(cfg: Config, actual: int) -> None:
     expected = cfg.model.expected_parameters
     if expected and abs(actual - expected) > PARAMETER_TOLERANCE * expected:
-        raise PretrainError(f"the model has {actual:,} parameters, model.expected_parameters is {expected:,} "
-                            f"(more than {PARAMETER_TOLERANCE:.0%} apart): the architecture changed")
+        raise PretrainError(
+            f"the model has {actual:,} parameters, model.expected_parameters is {expected:,} "
+            f"(more than {PARAMETER_TOLERANCE:.0%} apart): the architecture changed"
+        )
 
 
-def _code_version() -> Dict[str, Any]:
+def _code_version() -> dict[str, Any]:
     from ored.data.snapshot import code_version
+
     return code_version()
 
 
 class PretrainTrainer:
-
-    def __init__(self, cfg: Config, data: Optional[PretrainData] = None, store: Any = None) -> None:
+    def __init__(
+        self, cfg: Config, data: PretrainData | None = None, store: Any = None
+    ) -> None:
         if cfg.data.source != "tokens":
             raise PretrainError("PretrainTrainer trains on data.source: tokens")
-        if (cfg.checkpoint.best_metric, cfg.checkpoint.best_mode) != ("val_loss", "min"):
-            raise PretrainError("the pretraining loop keeps the epoch with the lowest val_loss")
+        if (cfg.checkpoint.best_metric, cfg.checkpoint.best_mode) != (
+            "val_loss",
+            "min",
+        ):
+            raise PretrainError(
+                "the pretraining loop keeps the epoch with the lowest val_loss"
+            )
         self.cfg = cfg
         set_seed(cfg.seed, cfg.deterministic)
         self.device = resolve_device(cfg.training.device)
@@ -170,18 +220,28 @@ class PretrainTrainer:
         self.precision = gpu.resolve_precision(cfg.training.precision, self.device)
 
         self.data = data or prepare_token_data(cfg)
-        self.model = build_model(cfg, vocab_size=self.data.tokenizer.vocab_size).to(self.device)
+        self.model = build_model(cfg, vocab_size=self.data.tokenizer.vocab_size).to(
+            self.device
+        )
         self.n_parameters = self.model.num_parameters()
         check_parameter_count(cfg, self.n_parameters)
         self.model_version = cfg.model.version or cfg.run_name
         self.optimizer = build_adamw(self.model, cfg, self.device)
         self.scaler = gpu.make_scaler(self.precision.use_scaler)
-        self.forward_model = torch.compile(self.model) if cfg.training.compile else self.model
+        self.forward_model = (
+            torch.compile(self.model) if cfg.training.compile else self.model
+        )
 
-        self.sampler = EpochSampler(len(self.data.train), cfg.seed, cfg.data.shuffle_train)
-        self.val_set = validation_sample(self.data.val, cfg.training.eval_windows, cfg.seed)
-        self.loaders = {"train": self._loader(self.data.train, self.sampler),
-                        "val": self._loader(self.val_set, None)}
+        self.sampler = EpochSampler(
+            len(self.data.train), cfg.seed, cfg.data.shuffle_train
+        )
+        self.val_set = validation_sample(
+            self.data.val, cfg.training.eval_windows, cfg.seed
+        )
+        self.loaders = {
+            "train": self._loader(self.data.train, self.sampler),
+            "val": self._loader(self.val_set, None),
+        }
         self.micro_batches_per_epoch = len(self.loaders["train"])
         self.accum = cfg.training.grad_accum_steps
         self.steps_per_epoch = math.ceil(self.micro_batches_per_epoch / self.accum)
@@ -189,66 +249,97 @@ class PretrainTrainer:
         self.schedule = build_schedule(cfg.training.scheduler)
         self.current_lr = cfg.training.learning_rate
 
-        self.best = BestCheckpoint(cfg.checkpoint_dir, cfg.checkpoint.best_metric, cfg.checkpoint.best_mode)
+        self.best = BestCheckpoint(
+            cfg.checkpoint_dir, cfg.checkpoint.best_metric, cfg.checkpoint.best_mode
+        )
         self.store = store
-        self.r2_object: Optional[str] = None
+        self.r2_object: str | None = None
         if cfg.checkpoint.r2_upload:
             from ored.storage import ObjectLayout, R2Settings
+
             settings = R2Settings.from_env()
             self.store = store or settings.checkpoint_store()
             self.r2_object = ObjectLayout(settings.prefix).checkpoint_best(cfg.run_name)
-        self.upload_errors: List[str] = []
+        self.upload_errors: list[str] = []
 
         self.start_epoch = 1
         self.skip_micro_batches = 0
         self.global_step = 0
-        self.history: List[Dict[str, Any]] = []
+        self.history: list[dict[str, Any]] = []
         self.evals_without_improvement = 0
         self.stop = False
         if cfg.training.resume and cfg.training.init_from:
-            raise PretrainError("use either --resume (same run) or --init-from (new run), not both")
+            raise PretrainError(
+                "use either --resume (same run) or --init-from (new run), not both"
+            )
         if cfg.training.init_from:
             self._init_from(cfg.training.init_from)
         if cfg.training.resume == "best":
             self._resume()
         elif cfg.training.resume:
-            raise PretrainError("this model resumes only from its own best.pt: training.resume=best")
+            raise PretrainError(
+                "this model resumes only from its own best.pt: training.resume=best"
+            )
 
-
-    def _loader(self, dataset: Any, sampler: Optional[Sampler]) -> DataLoader:
+    def _loader(self, dataset: Any, sampler: Sampler | None) -> DataLoader:
         cfg = self.cfg.data
         workers = cfg.num_workers
-        options: Dict[str, Any] = {"batch_size": cfg.batch_size, "num_workers": workers,
-                                   "pin_memory": cfg.pin_memory and self.device.type == "cuda"}
+        options: dict[str, Any] = {
+            "batch_size": cfg.batch_size,
+            "num_workers": workers,
+            "pin_memory": cfg.pin_memory and self.device.type == "cuda",
+        }
         if workers > 0:
-            options.update(persistent_workers=cfg.persistent_workers and sampler is None,
-                           prefetch_factor=cfg.prefetch_factor)
-        return DataLoader(dataset, sampler=sampler, shuffle=False, drop_last=False, **options)
+            options.update(
+                persistent_workers=cfg.persistent_workers and sampler is None,
+                prefetch_factor=cfg.prefetch_factor,
+            )
+        return DataLoader(
+            dataset, sampler=sampler, shuffle=False, drop_last=False, **options
+        )
 
-    def architecture(self) -> Dict[str, Any]:
+    def architecture(self) -> dict[str, Any]:
         return dict(self.model.describe())
 
     def _init_from(self, path: str) -> None:
         payload = BestCheckpoint(Path(path).parent).load(map_location=self.device)
-        check_compatible(payload, model_version=self.model_version, architecture=self.architecture(),
-                         tokenizer_sha256=self.data.tokenizer_info["sha256"], path=path)
+        check_compatible(
+            payload,
+            model_version=self.model_version,
+            architecture=self.architecture(),
+            tokenizer_sha256=self.data.tokenizer_info["sha256"],
+            path=path,
+        )
         self.model.load_state_dict(payload["model_state_dict"], strict=True)
-        self.initialised_from = {"path": str(path), "global_step": payload.get("global_step"),
-                                 "dataset": (payload.get("dataset") or {}).get("content_sha256")}
-        logger.info(f"weights from {path} (trained {payload.get('global_step'):,} steps on dataset "
-                    f"{(payload.get('dataset') or {}).get('name')} {(payload.get('dataset') or {}).get('version')})")
+        self.initialised_from = {
+            "path": str(path),
+            "global_step": payload.get("global_step"),
+            "dataset": (payload.get("dataset") or {}).get("content_sha256"),
+        }
+        logger.info(
+            f"weights from {path} (trained {payload.get('global_step'):,} steps on dataset "
+            f"{(payload.get('dataset') or {}).get('name')} {(payload.get('dataset') or {}).get('version')})"
+        )
 
     def _resume(self) -> None:
         payload = self.best.load(map_location=self.device)
-        check_compatible(payload, model_version=self.model_version, architecture=self.architecture(),
-                         tokenizer_sha256=self.data.tokenizer_info["sha256"],
-                         dataset_sha256=self.data.identity["content_sha256"], path=self.best.path)
+        check_compatible(
+            payload,
+            model_version=self.model_version,
+            architecture=self.architecture(),
+            tokenizer_sha256=self.data.tokenizer_info["sha256"],
+            dataset_sha256=self.data.identity["content_sha256"],
+            path=self.best.path,
+        )
         self.model.load_state_dict(payload["model_state_dict"], strict=True)
         if payload.get("optimizer_state_dict"):
             self.optimizer.load_state_dict(payload["optimizer_state_dict"])
         if payload.get("scaler_state_dict") and self.precision.use_scaler:
             self.scaler.load_state_dict(payload["scaler_state_dict"])
-        position = payload.get("position") or {"epoch": payload["epoch"], "epoch_complete": True}
+        position = payload.get("position") or {
+            "epoch": payload["epoch"],
+            "epoch_complete": True,
+        }
         if position.get("epoch_complete", True):
             self.start_epoch = int(position["epoch"]) + 1
         else:
@@ -256,9 +347,10 @@ class PretrainTrainer:
             self.skip_micro_batches = int(position["micro_batch"])
         self.global_step = int(payload["global_step"])
         self.history = list(payload.get("history") or [])
-        logger.info(f"resumed from {self.best.path} (epoch {payload['epoch']}, step {self.global_step:,}, "
-                    f"best val_loss {self.best.best_value:.4f})")
-
+        logger.info(
+            f"resumed from {self.best.path} (epoch {payload['epoch']}, step {self.global_step:,}, "
+            f"best val_loss {self.best.best_value:.4f})"
+        )
 
     def _loss(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         with self.precision.autocast(self.device):
@@ -267,8 +359,9 @@ class PretrainTrainer:
 
     def _apply_learning_rate(self) -> None:
         t = self.cfg.training
-        self.current_lr = t.learning_rate * self.schedule(self.global_step, self.total_steps,
-                                                          t.warmup_steps, t.min_lr_ratio)
+        self.current_lr = t.learning_rate * self.schedule(
+            self.global_step, self.total_steps, t.warmup_steps, t.min_lr_ratio
+        )
         for group in self.optimizer.param_groups:
             group["lr"] = self.current_lr
 
@@ -310,7 +403,9 @@ class PretrainTrainer:
             self._apply_learning_rate()
             if cfg.training.grad_clip and cfg.training.grad_clip > 0:
                 self.scaler.unscale_(self.optimizer)
-                nn.utils.clip_grad_norm_(self.model.parameters(), cfg.training.grad_clip)
+                nn.utils.clip_grad_norm_(
+                    self.model.parameters(), cfg.training.grad_clip
+                )
             self.scaler.step(self.optimizer)
             self.scaler.update()
             self.optimizer.zero_grad(set_to_none=True)
@@ -319,10 +414,12 @@ class PretrainTrainer:
             if self.global_step % cfg.training.log_every_steps == 0:
                 gpu.synchronize(self.device)
                 elapsed = time.perf_counter() - log_start
-                logger.info(f"epoch {epoch} step {self.global_step:,}/{self.total_steps:,} | "
-                            f"loss {(log_sum / log_count).item():.4f} | lr {self.current_lr:.2e} | "
-                            f"{log_tokens / max(elapsed, 1e-9):,.0f} tok/s | "
-                            f"peak {gpu.peak_memory_gib(self.device):.2f} GiB")
+                logger.info(
+                    f"epoch {epoch} step {self.global_step:,}/{self.total_steps:,} | "
+                    f"loss {(log_sum / log_count).item():.4f} | lr {self.current_lr:.2e} | "
+                    f"{log_tokens / max(elapsed, 1e-9):,.0f} tok/s | "
+                    f"peak {gpu.peak_memory_gib(self.device):.2f} GiB"
+                )
                 log_sum.zero_()
                 log_count = log_tokens = 0
                 log_start = time.perf_counter()
@@ -334,17 +431,21 @@ class PretrainTrainer:
                     return
 
         if self.last_eval_step != self.global_step and (
-                epoch % cfg.training.eval_every_epochs == 0 or epoch == cfg.training.epochs):
+            epoch % cfg.training.eval_every_epochs == 0 or epoch == cfg.training.epochs
+        ):
             self._evaluate_and_keep(epoch, n_micro)
 
     def _evaluate_and_keep(self, epoch: int, micro_done: int) -> None:
         gpu.synchronize(self.device)
         seconds = time.perf_counter() - self.eval_started
-        record: Dict[str, Any] = {
-            "epoch": epoch, "global_step": self.global_step, "micro_batch": micro_done,
+        record: dict[str, Any] = {
+            "epoch": epoch,
+            "global_step": self.global_step,
+            "micro_batch": micro_done,
             "epoch_complete": micro_done >= self.micro_batches_per_epoch,
             "train_loss": (self.eval_loss_sum / max(self.eval_examples, 1)).item(),
-            "tokens_per_second": self.eval_tokens / max(seconds, 1e-9), "lr": self.current_lr,
+            "tokens_per_second": self.eval_tokens / max(seconds, 1e-9),
+            "lr": self.current_lr,
         }
         try:
             record["val_loss"] = self.evaluate("val")
@@ -352,7 +453,9 @@ class PretrainTrainer:
             raise self._oom(exc) from exc
         record["val_ppl"] = math.exp(min(record["val_loss"], 20.0))
         record["peak_vram_gib"] = gpu.peak_memory_gib(self.device)
-        improved = self.best.consider(record["val_loss"], lambda: self.payload(epoch, record))
+        improved = self.best.consider(
+            record["val_loss"], lambda: self.payload(epoch, record)
+        )
         if improved:
             self._publish_best()
             self.evals_without_improvement = 0
@@ -385,8 +488,7 @@ class PretrainTrainer:
             examples += x.size(0)
         return (total / max(examples, 1)).item()
 
-
-    def payload(self, epoch: int, record: Dict[str, Any]) -> Dict[str, Any]:
+    def payload(self, epoch: int, record: dict[str, Any]) -> dict[str, Any]:
         t = self.cfg.training
         return {
             "schema": CHECKPOINT_SCHEMA,
@@ -395,14 +497,24 @@ class PretrainTrainer:
             "architecture": self.architecture(),
             "model_state_dict": self.model.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
-            "scheduler": {"name": t.scheduler, "current_lr": self.current_lr, "total_steps": self.total_steps,
-                          "warmup_steps": t.warmup_steps, "min_lr_ratio": t.min_lr_ratio},
-            "scaler_state_dict": self.scaler.state_dict() if self.precision.use_scaler else None,
+            "scheduler": {
+                "name": t.scheduler,
+                "current_lr": self.current_lr,
+                "total_steps": self.total_steps,
+                "warmup_steps": t.warmup_steps,
+                "min_lr_ratio": t.min_lr_ratio,
+            },
+            "scaler_state_dict": self.scaler.state_dict()
+            if self.precision.use_scaler
+            else None,
             "precision": self.precision.name,
             "epoch": epoch,
             "global_step": self.global_step,
-            "position": {"epoch": epoch, "micro_batch": record["micro_batch"],
-                         "epoch_complete": record["epoch_complete"]},
+            "position": {
+                "epoch": epoch,
+                "micro_batch": record["micro_batch"],
+                "epoch_complete": record["epoch_complete"],
+            },
             "best": {"metric": "val_loss", "mode": "min", "value": record["val_loss"]},
             "metrics": dict(record),
             "history": [dict(r) for r in self.history] + [dict(record)],
@@ -420,13 +532,13 @@ class PretrainTrainer:
         if self.store is None or self.r2_object is None:
             return
         from ored.storage.objects import replace_object
+
         try:
             replace_object(self.store, self.best.path, self.r2_object)
             logger.info(f"  best.pt replaced in R2 at {self.r2_object}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- report optional operation failures and keep the primary result
             self.upload_errors.append(f"{self.r2_object}: {exc}")
             logger.error(f"  R2 upload of best.pt failed (local best.pt kept): {exc}")
-
 
     def _oom(self, exc: BaseException) -> TrainingOOMError:
         cfg = self.cfg
@@ -438,9 +550,10 @@ class PretrainTrainer:
             f"{cfg.model.gradient_checkpointing}); peak allocated {peak:.2f} of {total:.2f} GiB. Lower "
             f"data.batch_size and raise training.grad_accum_steps to keep the effective batch, or set "
             f"model.gradient_checkpointing: true, or measure with scripts/pretrain.py --probe-batch-size. "
-            f"The run stopped; best.pt is unchanged. ({exc})")
+            f"The run stopped; best.pt is unchanged. ({exc})"
+        )
 
-    def fit(self) -> Dict[str, Any]:
+    def fit(self) -> dict[str, Any]:
         cfg = self.cfg
         self._log_header()
         gpu.reset_peak_memory(self.device)
@@ -458,28 +571,41 @@ class PretrainTrainer:
         self._save_history()
         elapsed = time.time() - started
         logger.info(section("TRAINING COMPLETE"))
-        logger.info(f"evaluations       : {len(self.history)}{' (stopped early)' if stopped_early else ''}")
+        logger.info(
+            f"evaluations       : {len(self.history)}{' (stopped early)' if stopped_early else ''}"
+        )
         logger.info(f"wall clock        : {elapsed:,.1f}s")
         logger.info(f"best val_loss     : {self.best.best_value}")
         logger.info(f"checkpoint        : {self.best.path} (the only checkpoint kept)")
         for error in self.upload_errors:
             logger.info(f"NOT UPLOADED      : {error}")
-        return {"history": self.history, "best_val_loss": self.best.best_value,
-                "best_path": str(self.best.path), "elapsed_seconds": elapsed,
-                "upload_errors": list(self.upload_errors), "parameters": self.n_parameters}
+        return {
+            "history": self.history,
+            "best_val_loss": self.best.best_value,
+            "best_path": str(self.best.path),
+            "elapsed_seconds": elapsed,
+            "upload_errors": list(self.upload_errors),
+            "parameters": self.n_parameters,
+        }
 
     def _save_history(self) -> None:
         path = self.best.directory / "history.json"
-        path.write_text(json.dumps({"config": self.cfg.to_dict(), "history": self.history}, indent=2),
-                        encoding="utf-8")
+        path.write_text(
+            json.dumps(
+                {"config": self.cfg.to_dict(), "history": self.history}, indent=2
+            ),
+            encoding="utf-8",
+        )
 
-    def _log_epoch(self, record: Dict[str, Any], improved: bool) -> None:
+    def _log_epoch(self, record: dict[str, Any], improved: bool) -> None:
         val = f" | val loss {record['val_loss']:.4f} (ppl {record['val_ppl']:.1f})"
         best = record["best_val_loss"]
-        logger.info(f"Epoch {record['epoch']:>3}/{self.cfg.training.epochs} step {record['global_step']:,} | train loss "
-                    f"{record['train_loss']:.4f}{val} | best {best if best is None else f'{best:.4f}'} | "
-                    f"{record['tokens_per_second']:,.0f} tok/s | peak {record['peak_vram_gib']:.2f} GiB"
-                    + ("  <- new best.pt" if improved else ""))
+        logger.info(
+            f"Epoch {record['epoch']:>3}/{self.cfg.training.epochs} step {record['global_step']:,} | train loss "
+            f"{record['train_loss']:.4f}{val} | best {best if best is None else f'{best:.4f}'} | "
+            f"{record['tokens_per_second']:,.0f} tok/s | peak {record['peak_vram_gib']:.2f} GiB"
+            + ("  <- new best.pt" if improved else "")
+        )
 
     def _log_header(self) -> None:
         cfg, data = self.cfg, self.data
@@ -488,39 +614,62 @@ class PretrainTrainer:
         for line in gpu.device_report(self.device):
             logger.info(line)
         d = self.model.describe()
-        logger.info(f"model         : {d['n_layer']} layers, d_model {d['d_model']}, {d['n_head']} heads, "
-                    f"d_ff {d['d_ff']}, block {d['block_size']}, vocab {d['vocab_size']}")
+        logger.info(
+            f"model         : {d['n_layer']} layers, d_model {d['d_model']}, {d['n_head']} heads, "
+            f"d_ff {d['d_ff']}, block {d['block_size']}, vocab {d['vocab_size']}"
+        )
         logger.info(f"parameters    : {self.n_parameters:,}")
-        logger.info(f"attention     : {cfg.model.attention} | gradient checkpointing "
-                    f"{cfg.model.gradient_checkpointing} | torch.compile {cfg.training.compile} | "
-                    f"tf32 {cfg.training.tf32}")
-        logger.info(f"precision     : {self.precision.name}"
-                    + (" (GradScaler on)" if self.precision.use_scaler else ""))
-        logger.info(f"batch         : micro-batch {cfg.data.batch_size} x {cfg.data.block_size} tokens, "
-                    f"grad accumulation {self.accum} -> effective {cfg.data.batch_size * self.accum} sequences "
-                    f"= {tokens_per_step:,} tokens per optimizer step")
-        logger.info(f"schedule      : {self.steps_per_epoch:,} steps/epoch, {self.total_steps:,} total, "
-                    f"{cfg.training.scheduler} lr {cfg.training.learning_rate} warmup {cfg.training.warmup_steps}")
-        logger.info(f"loader        : {cfg.data.num_workers} workers, pin_memory "
-                    f"{cfg.data.pin_memory and self.device.type == 'cuda'}")
+        logger.info(
+            f"attention     : {cfg.model.attention} | gradient checkpointing "
+            f"{cfg.model.gradient_checkpointing} | torch.compile {cfg.training.compile} | "
+            f"tf32 {cfg.training.tf32}"
+        )
+        logger.info(
+            f"precision     : {self.precision.name}"
+            + (" (GradScaler on)" if self.precision.use_scaler else "")
+        )
+        logger.info(
+            f"batch         : micro-batch {cfg.data.batch_size} x {cfg.data.block_size} tokens, "
+            f"grad accumulation {self.accum} -> effective {cfg.data.batch_size * self.accum} sequences "
+            f"= {tokens_per_step:,} tokens per optimizer step"
+        )
+        logger.info(
+            f"schedule      : {self.steps_per_epoch:,} steps/epoch, {self.total_steps:,} total, "
+            f"{cfg.training.scheduler} lr {cfg.training.learning_rate} warmup {cfg.training.warmup_steps}"
+        )
+        logger.info(
+            f"loader        : {cfg.data.num_workers} workers, pin_memory "
+            f"{cfg.data.pin_memory and self.device.type == 'cuda'}"
+        )
         ident = data.identity
-        logger.info(f"dataset       : {ident['name']} {ident['version']} (content {ident['content_sha256'][:16]}, "
-                    f"registry id {ident.get('registry_id') or 'not set'})")
+        logger.info(
+            f"dataset       : {ident['name']} {ident['version']} (content {ident['content_sha256'][:16]}, "
+            f"registry id {ident.get('registry_id') or 'not set'})"
+        )
         logger.info(f"  train       : {data.train.describe()}")
         logger.info(f"  val         : {data.val.describe()}")
         info = data.tokenizer_info
-        logger.info(f"tokenizer     : {info['name']} {info['version']} ({info['vocab_size']} tokens, "
-                    f"sha256 {info['sha256'][:16]})")
-        logger.info(f"checkpoint    : {self.best.path} (best only)"
-                    + (f"; R2 {self.r2_object}" if self.r2_object else ""))
+        logger.info(
+            f"tokenizer     : {info['name']} {info['version']} ({info['vocab_size']} tokens, "
+            f"sha256 {info['sha256'][:16]})"
+        )
+        logger.info(
+            f"checkpoint    : {self.best.path} (best only)"
+            + (f"; R2 {self.r2_object}" if self.r2_object else "")
+        )
         logger.info("-" * 78)
 
 
-def probe_batch_sizes(cfg: Config, candidates: Sequence[int] = (1, 2, 4, 6, 8, 12, 16, 24, 32),
-                      steps: int = 2) -> List[Dict[str, Any]]:
+def probe_batch_sizes(
+    cfg: Config,
+    candidates: Sequence[int] = (1, 2, 4, 6, 8, 12, 16, 24, 32),
+    steps: int = 2,
+) -> list[dict[str, Any]]:
     device = resolve_device(cfg.training.device)
     if device.type != "cuda":
-        raise PretrainError("--probe-batch-size measures GPU memory; it needs a CUDA device")
+        raise PretrainError(
+            "--probe-batch-size measures GPU memory; it needs a CUDA device"
+        )
     gpu.configure_backends(cfg.training.tf32, device)
     precision = gpu.resolve_precision(cfg.training.precision, device)
     model = build_model(cfg, vocab_size=cfg.data.vocab_size).to(device)
@@ -534,20 +683,36 @@ def probe_batch_sizes(cfg: Config, candidates: Sequence[int] = (1, 2, 4, 6, 8, 1
         try:
             started = time.perf_counter()
             for _ in range(steps):
-                x = torch.randint(0, cfg.data.vocab_size, (size, cfg.data.block_size), device=device)
+                x = torch.randint(
+                    0, cfg.data.vocab_size, (size, cfg.data.block_size), device=device
+                )
                 with precision.autocast(device):
                     logits = forward(x)
-                loss = F.cross_entropy(logits.float().view(-1, logits.size(-1)), x.view(-1))
+                loss = F.cross_entropy(
+                    logits.float().view(-1, logits.size(-1)), x.view(-1)
+                )
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad(set_to_none=True)
             gpu.synchronize(device)
             seconds = (time.perf_counter() - started) / steps
-            results.append({"batch_size": size, "fits": True, "peak_gib": gpu.peak_memory_gib(device),
-                            "tokens_per_second": size * cfg.data.block_size / seconds})
+            results.append(
+                {
+                    "batch_size": size,
+                    "fits": True,
+                    "peak_gib": gpu.peak_memory_gib(device),
+                    "tokens_per_second": size * cfg.data.block_size / seconds,
+                }
+            )
         except torch.cuda.OutOfMemoryError:
-            results.append({"batch_size": size, "fits": False, "peak_gib": gpu.peak_memory_gib(device)})
+            results.append(
+                {
+                    "batch_size": size,
+                    "fits": False,
+                    "peak_gib": gpu.peak_memory_gib(device),
+                }
+            )
             break
         finally:
             optimizer.zero_grad(set_to_none=True)
@@ -555,17 +720,32 @@ def probe_batch_sizes(cfg: Config, candidates: Sequence[int] = (1, 2, 4, 6, 8, 1
     return results
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="Pretrain the ~50M Ored model on token shards.")
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Pretrain the ~50M Ored model on token shards."
+    )
     parser.add_argument("--config", default="configs/ored50m.yaml")
-    parser.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
-    parser.add_argument("--resume", action="store_true", help="continue from this run's best.pt")
-    parser.add_argument("--describe", action="store_true",
-                        help="build the model, print its exact parameter count and stop (no data needed)")
-    parser.add_argument("--probe-batch-size", action="store_true",
-                        help="measure which micro-batch sizes fit in GPU memory and stop")
-    parser.add_argument("--init-from", metavar="BEST_PT",
-                        help="start a new run from an ored50m best.pt's weights (e.g. on a new dataset version)")
+    parser.add_argument(
+        "--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE"
+    )
+    parser.add_argument(
+        "--resume", action="store_true", help="continue from this run's best.pt"
+    )
+    parser.add_argument(
+        "--describe",
+        action="store_true",
+        help="build the model, print its exact parameter count and stop (no data needed)",
+    )
+    parser.add_argument(
+        "--probe-batch-size",
+        action="store_true",
+        help="measure which micro-batch sizes fit in GPU memory and stop",
+    )
+    parser.add_argument(
+        "--init-from",
+        metavar="BEST_PT",
+        help="start a new run from an ored50m best.pt's weights (e.g. on a new dataset version)",
+    )
     parser.add_argument("--run-name")
     args = parser.parse_args(argv)
     overrides = list(args.overrides) + (["training.resume=best"] if args.resume else [])
@@ -576,9 +756,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         cfg.run_name = args.run_name
     if args.describe:
         model = build_model(cfg, vocab_size=cfg.data.vocab_size)
-        print(json.dumps({**model.describe(), "attention": cfg.model.attention,
-                          "embeddings_tied": model.embeddings_tied,
-                          "expected_parameters": cfg.model.expected_parameters}, indent=2))
+        print(
+            json.dumps(
+                {
+                    **model.describe(),
+                    "attention": cfg.model.attention,
+                    "embeddings_tied": model.embeddings_tied,
+                    "expected_parameters": cfg.model.expected_parameters,
+                },
+                indent=2,
+            )
+        )
         check_parameter_count(cfg, model.num_parameters())
         return 0
     if args.probe_batch_size:

@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import pytest
-
-from ored.data.tokenizer import (UNK_TOKEN, CharTokenizer, SubwordTokenizer, Tokenizer,
-                                 build_tokenizer, pretokenize)
+from ored.data.tokenizer import (
+    UNK_TOKEN,
+    CharTokenizer,
+    SubwordTokenizer,
+    Tokenizer,
+    build_tokenizer,
+    pretokenize,
+)
 
 
 @pytest.fixture()
@@ -64,7 +69,10 @@ def test_build_tokenizer_rejects_unknown_name():
         build_tokenizer("bpe_that_does_not_exist_yet", "text")
 
 
-SUBWORD_TEXT = "the cat sees the cats .\nthe cat sat on 13 + 8 = 21 .\nWhat is velocity? It's fast.\n\n" * 10
+SUBWORD_TEXT = (
+    "the cat sees the cats .\nthe cat sat on 13 + 8 = 21 .\nWhat is velocity? It's fast.\n\n"
+    * 10
+)
 
 
 @pytest.fixture()
@@ -73,15 +81,25 @@ def subword():
 
 
 def test_subword_round_trip_is_exact_for_any_text(subword):
-    for text in [SUBWORD_TEXT, "the cat", "\n", "13 + 8 = 21", "  two  spaces\t",
-                 "héllo wörld", "日本語 😀", "Zebra!\r\n"]:
+    for text in [
+        SUBWORD_TEXT,
+        "the cat",
+        "\n",
+        "13 + 8 = 21",
+        "  two  spaces\t",
+        "héllo wörld",
+        "日本語 😀",
+        "Zebra!\r\n",
+    ]:
         assert subword.decode(subword.encode(text)) == text
 
 
 def test_subword_starts_from_the_256_bytes(subword):
     assert subword.vocab_size <= 320
-    assert [subword.token_bytes(i) for i in range(256)] == [bytes([b]) for b in range(256)]
-    assert subword.encode("😀") == list("😀".encode("utf-8"))
+    assert [subword.token_bytes(i) for i in range(256)] == [
+        bytes([b]) for b in range(256)
+    ]
+    assert subword.encode("😀") == list("😀".encode())
 
 
 def test_subword_pieces_are_longer_than_characters(subword):

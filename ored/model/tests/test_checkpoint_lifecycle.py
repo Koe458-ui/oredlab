@@ -5,7 +5,6 @@ import shutil
 
 import pytest
 import torch
-
 from ored.inference.predictor import load_predictor
 from ored.training.checkpoints import CheckpointManager, NoResumableCheckpoint
 from ored.training.trainer import Trainer
@@ -86,18 +85,29 @@ def test_each_role_has_the_state_it_needs(tiny_corpus):
     d = tiny_corpus.checkpoint_dir
 
     base = load_checkpoint(d / "base.pt")
-    assert base["checkpoint_kind"] == "base" and base["epoch"] == 0 and base["global_step"] == 0
+    assert (
+        base["checkpoint_kind"] == "base"
+        and base["epoch"] == 0
+        and base["global_step"] == 0
+    )
     assert base["optimizer_state_dict"] is None
 
     live = load_checkpoint(d / "live.pt")
     assert live["checkpoint_kind"] == "live"
     assert live["global_step"] == trainer.global_step
-    for key in ("optimizer_state_dict", "scheduler_state_dict", "rng_state", "trainer_state"):
+    for key in (
+        "optimizer_state_dict",
+        "scheduler_state_dict",
+        "rng_state",
+        "trainer_state",
+    ):
         assert live[key] is not None, key
     assert live["metrics"]["val_loss"] == trainer.history[-1]["val_loss"]
 
     best = load_checkpoint(d / "best.pt")
-    assert best["checkpoint_kind"] == "best" and best["optimizer_state_dict"] is not None
+    assert (
+        best["checkpoint_kind"] == "best" and best["optimizer_state_dict"] is not None
+    )
 
     export = load_checkpoint(d / "export.pt")
     assert export["checkpoint_kind"] == "export"
@@ -120,8 +130,12 @@ def test_best_is_the_epoch_with_the_lowest_validation_loss(tiny_corpus):
     best_epoch = losses.index(min(losses)) + 1
     best = load_checkpoint(tiny_corpus.checkpoint_dir / "best.pt")
     assert best["epoch"] == best_epoch == trainer.best_epoch
-    assert best["promotion"] == {"metric": "val_loss", "mode": "min",
-                                 "value": min(losses), "epoch": best_epoch}
+    assert best["promotion"] == {
+        "metric": "val_loss",
+        "mode": "min",
+        "value": min(losses),
+        "epoch": best_epoch,
+    }
 
 
 def test_best_can_follow_a_higher_is_better_metric(tiny_corpus):
@@ -150,7 +164,9 @@ def test_worse_epochs_do_not_overwrite_best(tiny_corpus, monkeypatch):
     Trainer(tiny_corpus).fit()
 
     bests = [loss for kind, loss in manager_writes if kind == "best"]
-    assert bests == sorted(bests, reverse=True), "each promoted best must beat the previous one"
+    assert bests == sorted(bests, reverse=True), (
+        "each promoted best must beat the previous one"
+    )
     assert len(set(bests)) == len(bests)
 
 
@@ -166,7 +182,10 @@ def test_history_is_saved_at_the_chosen_interval(tiny_corpus):
     for f in files:
         payload = load_checkpoint(f)
         assert payload["checkpoint_kind"] == "history"
-        assert f.name == f"epoch_{payload['epoch']:04d}_step_{payload['global_step']:08d}.pt"
+        assert (
+            f.name
+            == f"epoch_{payload['epoch']:04d}_step_{payload['global_step']:08d}.pt"
+        )
 
 
 def test_history_can_follow_steps(tiny_corpus):
@@ -176,7 +195,9 @@ def test_history_can_follow_steps(tiny_corpus):
     tiny_corpus.checkpoint.save_history_every_steps = 4
     trainer = Trainer(tiny_corpus)
     trainer.fit()
-    steps = [load_checkpoint(f)["global_step"] for f in trainer.checkpoints.history_files()]
+    steps = [
+        load_checkpoint(f)["global_step"] for f in trainer.checkpoints.history_files()
+    ]
     assert steps == list(range(4, trainer.global_step + 1, 4))
 
 
@@ -186,7 +207,9 @@ def test_no_history_unless_asked(tiny_corpus):
     assert trainer.checkpoints.history_files() == []
 
 
-def test_resume_from_live_at_an_epoch_boundary_matches_one_run(tiny_corpus, tmp_path, monkeypatch):
+def test_resume_from_live_at_an_epoch_boundary_matches_one_run(
+    tiny_corpus, tmp_path, monkeypatch
+):
     tiny_corpus.model.dropout = 0.2
     tiny_corpus.training.epochs = 4
     straight = Trainer(fresh(tiny_corpus, tmp_path / "straight"))
@@ -207,12 +230,16 @@ def test_resume_from_live_at_an_epoch_boundary_matches_one_run(tiny_corpus, tmp_
     resumed.fit()
 
     assert resumed.global_step == straight.global_step
-    assert [r["train_loss"] for r in resumed.history] == [r["train_loss"] for r in straight.history]
+    assert [r["train_loss"] for r in resumed.history] == [
+        r["train_loss"] for r in straight.history
+    ]
     assert resumed.best_epoch == straight.best_epoch
     assert_same_weights(params(resumed.model), params(straight.model))
 
 
-def test_resume_from_a_mid_epoch_live_matches_one_run(tiny_corpus, tmp_path, monkeypatch):
+def test_resume_from_a_mid_epoch_live_matches_one_run(
+    tiny_corpus, tmp_path, monkeypatch
+):
     tiny_corpus.model.dropout = 0.2
     tiny_corpus.checkpoint.save_live_every_epochs = 0
     tiny_corpus.checkpoint.save_live_every_steps = 4
@@ -236,11 +263,15 @@ def test_resume_from_a_mid_epoch_live_matches_one_run(tiny_corpus, tmp_path, mon
     resumed.fit()
 
     assert resumed.global_step == straight.global_step
-    assert [r["train_loss"] for r in resumed.history] == [r["train_loss"] for r in straight.history]
+    assert [r["train_loss"] for r in resumed.history] == [
+        r["train_loss"] for r in straight.history
+    ]
     assert_same_weights(params(resumed.model), params(straight.model))
 
 
-def test_resume_from_a_live_saved_on_the_last_batch_of_an_epoch(tiny_corpus, tmp_path, monkeypatch):
+def test_resume_from_a_live_saved_on_the_last_batch_of_an_epoch(
+    tiny_corpus, tmp_path, monkeypatch
+):
     tiny_corpus.model.dropout = 0.2
     probe = Trainer(fresh(tiny_corpus, tmp_path / "probe"))
     tiny_corpus.checkpoint.save_live_every_epochs = 0
@@ -269,7 +300,9 @@ def test_resume_from_a_live_saved_on_the_last_batch_of_an_epoch(tiny_corpus, tmp
     cfg.training.resume = "live"
     resumed = Trainer(cfg)
     resumed.fit()
-    assert [r["train_loss"] for r in resumed.history] == [r["train_loss"] for r in straight.history]
+    assert [r["train_loss"] for r in resumed.history] == [
+        r["train_loss"] for r in straight.history
+    ]
     assert_same_weights(params(resumed.model), params(straight.model))
 
 
@@ -372,14 +405,19 @@ def test_format_1_checkpoints_still_load(tiny_corpus, tmp_path):
         "metrics": {"loss": 0.4, "bpc": 0.9},
         "torch_version": "2.11.0+cu128",
         "saved_at": "2026-09-22 15:58:30",
-        "extra": {"model_description": {**v2["architecture"], "parameters": 1},
-                  "tokenizer": v2["tokenizer"]},
+        "extra": {
+            "model_description": {**v2["architecture"], "parameters": 1},
+            "tokenizer": v2["tokenizer"],
+        },
     }
     torch.save(v1, tmp_path / "old.pt")
 
     payload = load_checkpoint(tmp_path / "old.pt")
     assert payload["format_version"] == 1 and payload["checkpoint_kind"] is None
-    assert payload["model_state_dict"] is v1["model_state"] or payload["model_state_dict"].keys() == v1["model_state"].keys()
+    assert (
+        payload["model_state_dict"] is v1["model_state"]
+        or payload["model_state_dict"].keys() == v1["model_state"].keys()
+    )
     assert payload["created_at"] == "2026-09-22 15:58:30"
     assert PromotionRule().value(payload["metrics"]) == 0.4
 
@@ -391,8 +429,16 @@ def test_a_format_1_file_cannot_be_resumed_exactly(tiny_corpus, tmp_path):
     Trainer(tiny_corpus).fit()
     d = tiny_corpus.checkpoint_dir
     v2 = torch.load(d / "live.pt", weights_only=True)
-    torch.save({"format_version": 1, "model_state": v2["model_state_dict"], "config": v2["config"],
-                "epoch": 5, "metrics": {}}, d / "live.pt")
+    torch.save(
+        {
+            "format_version": 1,
+            "model_state": v2["model_state_dict"],
+            "config": v2["config"],
+            "epoch": 5,
+            "metrics": {},
+        },
+        d / "live.pt",
+    )
     tiny_corpus.training.resume = "live"
     with pytest.raises(NoResumableCheckpoint, match="warm-start"):
         Trainer(tiny_corpus)
@@ -419,16 +465,24 @@ def test_language_model_checkpoints_carry_the_tokenizer(tiny_corpus):
 
 
 def test_train_flags_become_checkpoint_settings():
-    from ored.training.trainer import checkpoint_overrides, main
     import argparse
 
-    args = argparse.Namespace(resume_live=False, init_from="checkpoints/ored_v2/best.pt",
-                              history_every=10, history_every_steps=None,
-                              live_every_steps=500, upload=True)
+    from ored.training.trainer import checkpoint_overrides, main
+
+    args = argparse.Namespace(
+        resume_live=False,
+        init_from="checkpoints/ored_v2/best.pt",
+        history_every=10,
+        history_every_steps=None,
+        live_every_steps=500,
+        upload=True,
+    )
     assert checkpoint_overrides(args) == [
         "training.resume=checkpoints/ored_v2/best.pt",
-        "checkpoint.keep_history=true", "checkpoint.save_history_every_epochs=10",
-        "checkpoint.save_live_every_steps=500", "checkpoint.upload=true",
+        "checkpoint.keep_history=true",
+        "checkpoint.save_history_every_epochs=10",
+        "checkpoint.save_live_every_steps=500",
+        "checkpoint.upload=true",
     ]
     with pytest.raises(SystemExit):
         main(["--resume-live", "--init-from", "x.pt"])
@@ -440,14 +494,22 @@ def test_init_from_starts_a_new_run_from_another_checkpoint(tiny_corpus, tmp_pat
     cfg = fresh(tiny_corpus, tmp_path / "new")
     cfg.training.resume = str(donor.checkpoints.path("best"))
     started = Trainer(cfg)
-    assert_same_weights(params(started.model), load_checkpoint(donor.checkpoints.path("best"))["model_state_dict"])
+    assert_same_weights(
+        params(started.model),
+        load_checkpoint(donor.checkpoints.path("best"))["model_state_dict"],
+    )
     started.fit()
     base = load_checkpoint(cfg.checkpoint_dir / "base.pt")
-    assert_same_weights(base["model_state_dict"], load_checkpoint(donor.checkpoints.path("best"))["model_state_dict"])
+    assert_same_weights(
+        base["model_state_dict"],
+        load_checkpoint(donor.checkpoints.path("best"))["model_state_dict"],
+    )
     assert started.history[0]["epoch"] == 1
 
 
-def test_save_a_better_file_as_best_keeps_the_old_best_in_history(tiny_corpus, tmp_path):
+def test_save_a_better_file_as_best_keeps_the_old_best_in_history(
+    tiny_corpus, tmp_path
+):
     from ored.training.checkpoints import evaluate_file, place_checkpoint
 
     short = fresh(tiny_corpus, tmp_path / "short")
@@ -458,17 +520,23 @@ def test_save_a_better_file_as_best_keeps_the_old_best_in_history(tiny_corpus, t
     Trainer(long).fit()
     old_best = load_checkpoint(short.checkpoint_dir / "best.pt")
 
-    path, message = place_checkpoint(short, long.checkpoint_dir / "best.pt", "best", device="cpu")
+    path, message = place_checkpoint(
+        short, long.checkpoint_dir / "best.pt", "best", device="cpu"
+    )
 
     assert path == short.checkpoint_dir / "best.pt" and "promoted" in message
     best = load_checkpoint(path)
     assert best["checkpoint_kind"] == "best"
     assert best["epoch"] == load_checkpoint(long.checkpoint_dir / "best.pt")["epoch"]
-    assert best["metrics"]["val_loss"] == pytest.approx(evaluate_file(path, short, "cpu")["val_loss"])
+    assert best["metrics"]["val_loss"] == pytest.approx(
+        evaluate_file(path, short, "cpu")["val_loss"]
+    )
     archived = list((short.checkpoint_dir / "history").glob("*.pt"))
     assert len(archived) == 1
     assert load_checkpoint(archived[0])["checkpoint_kind"] == "history"
-    assert_same_weights(load_checkpoint(archived[0])["model_state_dict"], old_best["model_state_dict"])
+    assert_same_weights(
+        load_checkpoint(archived[0])["model_state_dict"], old_best["model_state_dict"]
+    )
 
 
 def test_save_a_worse_file_as_best_changes_nothing(tiny_corpus, tmp_path):
@@ -478,14 +546,21 @@ def test_save_a_worse_file_as_best_changes_nothing(tiny_corpus, tmp_path):
     Trainer(tiny_corpus).fit()
     before = (tiny_corpus.checkpoint_dir / "best.pt").read_bytes()
 
-    path, message = place_checkpoint(tiny_corpus, tiny_corpus.checkpoint_dir / "base.pt", "best", device="cpu")
+    path, message = place_checkpoint(
+        tiny_corpus, tiny_corpus.checkpoint_dir / "base.pt", "best", device="cpu"
+    )
 
     assert path is None and "not promoted" in message
     assert (tiny_corpus.checkpoint_dir / "best.pt").read_bytes() == before
     assert not (tiny_corpus.checkpoint_dir / "history").exists()
 
-    path, _ = place_checkpoint(tiny_corpus, tiny_corpus.checkpoint_dir / "base.pt", "best",
-                               force=True, device="cpu")
+    path, _ = place_checkpoint(
+        tiny_corpus,
+        tiny_corpus.checkpoint_dir / "base.pt",
+        "best",
+        force=True,
+        device="cpu",
+    )
     assert load_checkpoint(path)["epoch"] == 0
 
 
@@ -500,7 +575,10 @@ def test_save_as_history_and_live(tiny_corpus):
     assert load_checkpoint(second)["checkpoint_kind"] == "history"
 
     live, message = place_checkpoint(tiny_corpus, d / "best.pt", "live")
-    assert load_checkpoint(live)["checkpoint_kind"] == "live" and "previous live kept" in message
+    assert (
+        load_checkpoint(live)["checkpoint_kind"] == "live"
+        and "previous live kept" in message
+    )
 
     with pytest.raises(CheckpointError, match="--init-from"):
         place_checkpoint(tiny_corpus, d / "base.pt", "live")
@@ -513,17 +591,24 @@ def test_merge_live_from_an_online_session(tiny_corpus, tmp_path, capsys):
     tiny_corpus.training.epochs = 1
     Trainer(tiny_corpus).fit()
     best = tiny_corpus.checkpoint_dir / "best.pt"
-    learner = OnlineLearner.from_checkpoint(best, device="cpu", live_dir=tmp_path / "live",
-                                            policy=OnlinePolicy(learning_rate=1e-3, save_every=0))
+    learner = OnlineLearner.from_checkpoint(
+        best,
+        device="cpu",
+        live_dir=tmp_path / "live",
+        policy=OnlinePolicy(learning_rate=1e-3, save_every=0),
+    )
     for _ in range(3):
         learner.learn("the small cat sees the red dog .")
     live = learner.save()
 
     import yaml
+
     config = tmp_path / "run.yaml"
     config.write_text(yaml.safe_dump(tiny_corpus.to_dict()))
 
-    code = cli_main(["merge-live", "--config", str(config), "--live", str(live), "--device", "cpu"])
+    code = cli_main(
+        ["merge-live", "--config", str(config), "--live", str(live), "--device", "cpu"]
+    )
     out = capsys.readouterr().out
     assert ("promoted to best" in out) == (code == 0)
     assert "not promoted" in out or "BEST" in out

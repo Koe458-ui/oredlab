@@ -21,7 +21,9 @@ def cosine_with_warmup(
     return min_ratio + (1.0 - min_ratio) * cosine
 
 
-def constant(step: int, total_steps: int, warmup_steps: int, min_ratio: float = 0.1) -> float:
+def constant(
+    step: int, total_steps: int, warmup_steps: int, min_ratio: float = 0.1
+) -> float:
     return 1.0
 
 

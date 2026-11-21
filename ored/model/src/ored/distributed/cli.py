@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import torch
 import torch.distributed as dist
@@ -41,7 +41,7 @@ def _env(name: str, fallback: Any) -> str:
     return value if value else str(fallback)
 
 
-def torchrun_command(args: argparse.Namespace, cfg: Config) -> List[str]:
+def torchrun_command(args: argparse.Namespace, cfg: Config) -> list[str]:
     settings = cfg.distributed
     nnodes = args.nnodes or _env("NNODES", settings.nnodes)
     nproc = args.nproc_per_node or _env("NPROC_PER_NODE", settings.nproc_per_node)
@@ -50,23 +50,53 @@ def torchrun_command(args: argparse.Namespace, cfg: Config) -> List[str]:
     session = args.session or _env("ORED_SESSION", "")
     rendezvous = args.rendezvous or settings.rendezvous_backend
     if not session:
-        raise DistributedError("give every PC the same --session (or ORED_SESSION), e.g. --session ored_v3-run1")
+        raise DistributedError(
+            "give every PC the same --session (or ORED_SESSION), e.g. --session ored_v3-run1"
+        )
     if not master_addr:
-        raise DistributedError("set --master-addr (or MASTER_ADDR) to the address of the PC running rank 0")
-    command = [sys.executable, "-m", "torch.distributed.run",
-               f"--nnodes={nnodes}", f"--nproc-per-node={nproc}", f"--max-restarts={settings.max_restarts}"]
+        raise DistributedError(
+            "set --master-addr (or MASTER_ADDR) to the address of the PC running rank 0"
+        )
+    command = [
+        sys.executable,
+        "-m",
+        "torch.distributed.run",
+        f"--nnodes={nnodes}",
+        f"--nproc-per-node={nproc}",
+        f"--max-restarts={settings.max_restarts}",
+    ]
     if rendezvous == "static":
         if ":" in str(nnodes):
             raise DistributedError("a MIN:MAX node count needs the c10d rendezvous")
-        node_rank = args.node_rank if args.node_rank is not None else _env("NODE_RANK", "")
+        node_rank = (
+            args.node_rank if args.node_rank is not None else _env("NODE_RANK", "")
+        )
         if node_rank == "":
-            raise DistributedError("static rendezvous needs --node-rank (or NODE_RANK): 0 on the master PC, 1, 2, ... on the others")
-        command += [f"--node-rank={node_rank}", f"--master-addr={master_addr}", f"--master-port={master_port}",
-                    f"--rdzv-id={session}"]
+            raise DistributedError(
+                "static rendezvous needs --node-rank (or NODE_RANK): 0 on the master PC, 1, 2, ... on the others"
+            )
+        command += [
+            f"--node-rank={node_rank}",
+            f"--master-addr={master_addr}",
+            f"--master-port={master_port}",
+            f"--rdzv-id={session}",
+        ]
     else:
-        command += ["--rdzv-backend=c10d", f"--rdzv-endpoint={master_addr}:{master_port}",
-                    f"--rdzv-id={session}", f"--rdzv-conf=join_timeout={settings.timeout_seconds}"]
-    command += ["-m", "ored.distributed", args.command, "--config", args.config, "--session", session]
+        command += [
+            "--rdzv-backend=c10d",
+            f"--rdzv-endpoint={master_addr}:{master_port}",
+            f"--rdzv-id={session}",
+            f"--rdzv-conf=join_timeout={settings.timeout_seconds}",
+        ]
+    command += [
+        "-m",
+        "ored.distributed",
+        args.command,
+        "--config",
+        args.config,
+        "--session",
+        session,
+    ]
     for override in args.overrides:
         command += ["--set", override]
     return command + list(args.extra)
@@ -76,7 +106,9 @@ def cmd_launch(args: argparse.Namespace) -> int:
     cfg = load_config(args.config, args.overrides)
     command = torchrun_command(args, cfg)
     env = dict(os.environ)
-    env["PYTHONPATH"] = os.pathsep.join(p for p in (str(SRC), env.get("PYTHONPATH", "")) if p)
+    env["PYTHONPATH"] = os.pathsep.join(
+        p for p in (str(SRC), env.get("PYTHONPATH", "")) if p
+    )
     env["ORED_SESSION"] = command[command.index("--session") + 1]
     if platform.system() == "Windows":
         env.setdefault("USE_LIBUV", "0")
@@ -86,17 +118,19 @@ def cmd_launch(args: argparse.Namespace) -> int:
     return subprocess.call(command, env=env)
 
 
-def session_config(cfg: Config, env: DistEnv, batch_size: int) -> Dict[str, Any]:
+def session_config(cfg: Config, env: DistEnv, batch_size: int) -> dict[str, Any]:
     config = cfg.to_dict()
-    config["distributed"].update({
-        "enabled": True,
-        "world_size": env.world_size,
-        "expected_nodes": env.nnodes,
-        "nproc_per_node": env.local_world_size,
-        "master": f"{env.master_addr}:{env.master_port}",
-        "batch_per_worker": batch_size,
-        "global_batch": batch_size * env.world_size,
-    })
+    config["distributed"].update(
+        {
+            "enabled": True,
+            "world_size": env.world_size,
+            "expected_nodes": env.nnodes,
+            "nproc_per_node": env.local_world_size,
+            "master": f"{env.master_addr}:{env.master_port}",
+            "batch_per_worker": batch_size,
+            "global_batch": batch_size * env.world_size,
+        }
+    )
     return config
 
 
@@ -109,10 +143,14 @@ def ensure_snapshot(cfg: Config, env: DistEnv) -> Any:
         raise DistributedError(
             "a distributed run trains every PC on the same data, so it needs a pinned snapshot: take one with\n"
             f"  python scripts/training_data.py snapshot --dataset-tag {settings.dataset_tag} --upload\n"
-            "and pass --set data.supabase.snapshot=<the hash it prints> on every PC")
+            "and pass --set data.supabase.snapshot=<the hash it prints> on every PC"
+        )
     prepared = None
     if env.local_rank == 0:
-        needs_download = find_local(settings.snapshot_dir, settings.dataset_tag, settings.snapshot) is None
+        needs_download = (
+            find_local(settings.snapshot_dir, settings.dataset_tag, settings.snapshot)
+            is None
+        )
         store, files = supabase_from_env(required=needs_download)
         prepared = prepare_dataset(cfg, store if env.is_coordinator else None, files)
     env.barrier()
@@ -122,10 +160,11 @@ def ensure_snapshot(cfg: Config, env: DistEnv) -> Any:
 def ensure_data(cfg: Config, env: DistEnv) -> Any:
     if cfg.data.source == "supabase":
         return ensure_snapshot(cfg, env)
-    if env.local_rank == 0:
-        if not (Path(cfg.data.corpus.dir) / "train.txt").exists():
-            from ored.data.corpus import generate_corpus
-            generate_corpus(cfg)
+    corpus_path = Path(cfg.data.corpus.dir) / "train.txt"
+    if env.local_rank == 0 and not corpus_path.exists():
+        from ored.data.corpus import generate_corpus
+
+        generate_corpus(cfg)
     env.barrier()
 
 
@@ -134,20 +173,31 @@ def remote_from_env(cfg: Config) -> Any:
         return None
     from ored.learning.checkpoints import CheckpointStore
     from ored.learning.supabase_store import SupabaseStore
+
     return SupabaseStore.from_env(), CheckpointStore.from_env()
 
 
 def control_from_env(cfg: Config, env: DistEnv) -> Any:
     from ored.distributed.control import ControlPlane, SupabaseControlPlane
+
     if not cfg.distributed.report_to_supabase:
         return ControlPlane()
     from ored.learning.supabase_store import SupabaseStore
-    return SupabaseControlPlane(SupabaseStore.from_env(), env, cfg.distributed.heartbeat_seconds)
+
+    return SupabaseControlPlane(
+        SupabaseStore.from_env(), env, cfg.distributed.heartbeat_seconds
+    )
 
 
-def run_training(cfg: Config, env: DistEnv, remote: Any = None, control: Any = None) -> Any:
+def run_training(
+    cfg: Config, env: DistEnv, remote: Any = None, control: Any = None
+) -> Any:
     from ored.distributed.control import ControlPlane
-    from ored.distributed.trainer import DistributedTrainer, per_worker_batch_size, quiet_other_ranks
+    from ored.distributed.trainer import (
+        DistributedTrainer,
+        per_worker_batch_size,
+        quiet_other_ranks,
+    )
     from ored.training.checkpoints import NoResumableCheckpoint
 
     quiet_other_ranks(env)
@@ -160,7 +210,11 @@ def run_training(cfg: Config, env: DistEnv, remote: Any = None, control: Any = N
         dataset_tag = f"{cfg.task}:{cfg.data.corpus.dir}"
         if cfg.data.source == "supabase":
             dataset_tag = cfg.data.supabase.dataset_tag
-        control.start(cfg.run_name, dataset_tag, session_config(cfg, env, per_worker_batch_size(cfg, env.world_size)))
+        control.start(
+            cfg.run_name,
+            dataset_tag,
+            session_config(cfg, env, per_worker_batch_size(cfg, env.world_size)),
+        )
         if prepared is not None and prepared.dataset is not None:
             control.link_dataset(prepared.dataset.id, prepared.snapshot.record_count)
         try:
@@ -172,15 +226,18 @@ def run_training(cfg: Config, env: DistEnv, remote: Any = None, control: Any = N
             trainer = DistributedTrainer(cfg, env, control, remote)
         result = trainer.fit()
         last = result["history"][-1] if result["history"] else {}
-        control.finish("completed", metrics={
-            "world_size": env.world_size,
-            "epochs": len(result["history"]),
-            "global_step": trainer.global_step,
-            "best_metric": result["best_metric"],
-            "best_value": result["best_value"],
-            "best_epoch": result["best_epoch"],
-            **{k: v for k, v in last.items() if isinstance(v, (int, float))},
-        })
+        control.finish(
+            "completed",
+            metrics={
+                "world_size": env.world_size,
+                "epochs": len(result["history"]),
+                "global_step": trainer.global_step,
+                "best_metric": result["best_metric"],
+                "best_value": result["best_value"],
+                "best_epoch": result["best_epoch"],
+                **{k: v for k, v in last.items() if isinstance(v, (int, float))},
+            },
+        )
         trainer.result = result
         return trainer
     except KeyboardInterrupt:
@@ -205,7 +262,9 @@ def cmd_train(args: argparse.Namespace) -> int:
     env = DistEnv.from_environ(cfg.distributed, args.session)
     if not env.session_key:
         if env.world_size > 1:
-            raise DistributedError("every worker needs the same --session (or ORED_SESSION)")
+            raise DistributedError(
+                "every worker needs the same --session (or ORED_SESSION)"
+            )
         env.session_key = f"{cfg.run_name}-single"
     env.init()
     try:
@@ -222,9 +281,12 @@ def cmd_test(args: argparse.Namespace) -> int:
     try:
         env.select_device(cfg.training.device)
         info = env.describe()
-        print(f"[rank {env.rank}/{env.world_size}] host {info['hostname']} node {env.node_rank} "
-              f"device {info['device']} {info['gpu']} cuda {info['cuda'] or '-'} torch {info['torch']} "
-              f"master {info['master']} backend {env.backend}", flush=True)
+        print(
+            f"[rank {env.rank}/{env.world_size}] host {info['hostname']} node {env.node_rank} "
+            f"device {info['device']} {info['gpu']} cuda {info['cuda'] or '-'} torch {info['torch']} "
+            f"master {info['master']} backend {env.backend}",
+            flush=True,
+        )
         everyone = env.all_gather_object(info)
         total = env.all_reduce_sum([float(env.rank + 1)])[0]
         size = 4 * 1024 * 1024
@@ -238,20 +300,38 @@ def cmd_test(args: argparse.Namespace) -> int:
             expected = env.world_size * (env.world_size + 1) / 2
             ranks = sorted(p["rank"] for p in everyone)
             print(section("ORED -- DISTRIBUTED CONNECTIVITY TEST"))
-            print(f"{'rank':>4}  {'node':>4}  {'host':<20} {'device':<8} {'gpu':<24} {'torch':<14} os")
+            print(
+                f"{'rank':>4}  {'node':>4}  {'host':<20} {'device':<8} {'gpu':<24} {'torch':<14} os"
+            )
             for p in sorted(everyone, key=lambda p: p["rank"]):
-                print(f"{p['rank']:>4}  {p['node_rank']:>4}  {p['hostname'][:20]:<20} {p['device']:<8} "
-                      f"{(p['gpu'] or '-')[:24]:<24} {p['torch']:<14} {p['os']}")
+                print(
+                    f"{p['rank']:>4}  {p['node_rank']:>4}  {p['hostname'][:20]:<20} {p['device']:<8} "
+                    f"{(p['gpu'] or '-')[:24]:<24} {p['torch']:<14} {p['os']}"
+                )
             checks = [
-                ("all ranks discovered", ranks == list(range(env.world_size)), f"{len(ranks)} of {env.world_size}"),
-                ("all ranks connected (all-gather)", len(everyone) == env.world_size, ""),
-                ("all-reduce", abs(total - expected) < 1e-9, f"sum {total:.0f}, expected {expected:.0f}"),
+                (
+                    "all ranks discovered",
+                    ranks == list(range(env.world_size)),
+                    f"{len(ranks)} of {env.world_size}",
+                ),
+                (
+                    "all ranks connected (all-gather)",
+                    len(everyone) == env.world_size,
+                    "",
+                ),
+                (
+                    "all-reduce",
+                    abs(total - expected) < 1e-9,
+                    f"sum {total:.0f}, expected {expected:.0f}",
+                ),
                 ("barrier", True, ""),
             ]
             for name, ok, detail in checks:
                 print(f"  {'OK  ' if ok else 'FAIL'} {name} {detail}")
-            print(f"  all-reduce of 16 MB took {seconds * 1000:.0f} ms "
-                  f"({2 * 16 * (env.world_size - 1) / env.world_size / max(seconds, 1e-9):.0f} MB/s per worker)")
+            print(
+                f"  all-reduce of 16 MB took {seconds * 1000:.0f} ms "
+                f"({2 * 16 * (env.world_size - 1) / env.world_size / max(seconds, 1e-9):.0f} MB/s per worker)"
+            )
             ok = all(c[1] for c in checks)
             print("VERIFIED: every worker can train together" if ok else "FAILED")
             return 0 if ok else 1
@@ -270,14 +350,25 @@ def cmd_verify(args: argparse.Namespace) -> int:
     elif UUID.match(target):
         from ored.learning.checkpoints import CheckpointStore
         from ored.learning.supabase_store import SupabaseStore
-        manifest, problems = verify_group_remote(SupabaseStore.from_env(), CheckpointStore.from_env(), target, cfg)
+
+        manifest, problems = verify_group_remote(
+            SupabaseStore.from_env(), CheckpointStore.from_env(), target, cfg
+        )
     else:
-        problems, manifest = [f"{target} is neither a checkpoint folder nor a checkpoint_group_id"], None
+        problems, manifest = (
+            [f"{target} is neither a checkpoint folder nor a checkpoint_group_id"],
+            None,
+        )
     print(report(manifest, problems, target, model_checked=cfg is not None))
     return 0 if not problems else 1
 
 
-def report(manifest: Optional[Dict[str, Any]], problems: List[str], target: str, model_checked: bool) -> str:
+def report(
+    manifest: dict[str, Any] | None,
+    problems: list[str],
+    target: str,
+    model_checked: bool,
+) -> str:
     lines = ["Ored Distributed Checkpoint", ""]
     if manifest:
         ranks = sorted({s["rank"] for s in manifest["shards"]})
@@ -311,7 +402,9 @@ def cmd_consolidate(args: argparse.Namespace) -> int:
     from ored.distributed.checkpoint import consolidate
 
     out = consolidate(args.checkpoint, args.out)
-    print(f"wrote {out}: one .pt with the model weights, loadable by infer.py, evaluate.py and serve.py")
+    print(
+        f"wrote {out}: one .pt with the model weights, loadable by infer.py, evaluate.py and serve.py"
+    )
     return 0
 
 
@@ -326,7 +419,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     def config_args(p: argparse.ArgumentParser, required: bool = True) -> None:
         p.add_argument("--config", required=required)
-        p.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
+        p.add_argument(
+            "--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE"
+        )
 
     p = sub.add_parser("launch", help="build and run the torchrun command for this PC")
     p.add_argument("command", choices=["train", "test"])
@@ -338,7 +433,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--master-addr", default="")
     p.add_argument("--master-port", default="")
     p.add_argument("--rendezvous", choices=["c10d", "static"], default="")
-    p.add_argument("--dry-run", action="store_true", help="print the command without running it")
+    p.add_argument(
+        "--dry-run", action="store_true", help="print the command without running it"
+    )
     p.set_defaults(func=cmd_launch, extra=[])
 
     p = sub.add_parser("train", help="(run by torchrun) train on every worker")
@@ -350,8 +447,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--history-every", type=int)
     p.add_argument("--history-every-steps", type=int)
     p.add_argument("--live-every-steps", type=int)
-    p.add_argument("--upload", action="store_true", help="upload checkpoint shards to Supabase")
-    p.add_argument("--report", action="store_true", help="record the session and workers in Supabase")
+    p.add_argument(
+        "--upload", action="store_true", help="upload checkpoint shards to Supabase"
+    )
+    p.add_argument(
+        "--report",
+        action="store_true",
+        help="record the session and workers in Supabase",
+    )
     p.set_defaults(func=cmd_train)
 
     p = sub.add_parser("test", help="(run by torchrun) connectivity test")
@@ -371,12 +474,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    extra: List[str] = []
+    extra: list[str] = []
     if "--" in argv:
-        extra = argv[argv.index("--") + 1:]
-        argv = argv[:argv.index("--")]
+        extra = argv[argv.index("--") + 1 :]
+        argv = argv[: argv.index("--")]
     args = build_parser().parse_args(argv)
     args.extra = extra
     try:

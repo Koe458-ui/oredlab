@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
-
 import torch
 from torch.utils.data import DataLoader, Dataset
 
@@ -12,11 +10,17 @@ from ored.data.tokenizer import Tokenizer, build_tokenizer
 
 
 class TextDataset(Dataset):
-
-    def __init__(self, token_ids: torch.Tensor, block_size: int, stride: int,
-                 characters: int | None = None) -> None:
+    def __init__(
+        self,
+        token_ids: torch.Tensor,
+        block_size: int,
+        stride: int,
+        characters: int | None = None,
+    ) -> None:
         if token_ids.dim() != 1:
-            raise ValueError(f"expected a 1-D tensor of ids, got {tuple(token_ids.shape)}")
+            raise ValueError(
+                f"expected a 1-D tensor of ids, got {tuple(token_ids.shape)}"
+            )
         if token_ids.numel() < block_size + 1:
             raise ValueError(
                 f"corpus has only {token_ids.numel()} tokens, which is fewer than "
@@ -30,16 +34,16 @@ class TextDataset(Dataset):
         self.stride = stride
 
         last_start = token_ids.numel() - block_size - 1
-        self.starts: List[int] = list(range(0, last_start + 1, stride))
+        self.starts: list[int] = list(range(0, last_start + 1, stride))
 
     def __len__(self) -> int:
         return len(self.starts)
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         start = self.starts[index]
         end = start + self.block_size
         x = self.token_ids[start:end]
-        y = self.token_ids[start + 1:end + 1]
+        y = self.token_ids[start + 1 : end + 1]
         return x, y
 
     @property
@@ -57,17 +61,21 @@ class TextDataset(Dataset):
         )
 
 
-def build_text_datasets(cfg: Config) -> Tuple[Dict[str, TextDataset], Tokenizer]:
+def build_text_datasets(cfg: Config) -> tuple[dict[str, TextDataset], Tokenizer]:
     directory = corpus_directory(cfg)
     texts = {split: read_corpus(directory, split) for split in SPLITS}
 
-    tokenizer = build_tokenizer(cfg.data.tokenizer, texts["train"], vocab_size=cfg.data.vocab_size)
+    tokenizer = build_tokenizer(
+        cfg.data.tokenizer, texts["train"], vocab_size=cfg.data.vocab_size
+    )
 
-    datasets: Dict[str, TextDataset] = {}
+    datasets: dict[str, TextDataset] = {}
     for split in SPLITS:
         ids = torch.tensor(tokenizer.encode(texts[split]), dtype=torch.long)
         stride = cfg.data.stride if split == "train" else cfg.data.block_size
-        datasets[split] = TextDataset(ids, cfg.data.block_size, stride, characters=len(texts[split]))
+        datasets[split] = TextDataset(
+            ids, cfg.data.block_size, stride, characters=len(texts[split])
+        )
 
     return datasets, tokenizer
 
@@ -75,7 +83,7 @@ def build_text_datasets(cfg: Config) -> Tuple[Dict[str, TextDataset], Tokenizer]
 def build_text_dataloaders(
     cfg: Config,
     generator: torch.Generator | None = None,
-) -> Tuple[Dict[str, DataLoader], Dict[str, TextDataset], Tokenizer]:
+) -> tuple[dict[str, DataLoader], dict[str, TextDataset], Tokenizer]:
     datasets, tokenizer = build_text_datasets(cfg)
 
     loaders = {

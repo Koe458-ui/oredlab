@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import contextlib
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import Any
 
 import torch
 
@@ -10,7 +10,7 @@ import torch
 @dataclass(frozen=True)
 class Precision:
     name: str
-    dtype: Optional[torch.dtype]
+    dtype: torch.dtype | None
     use_scaler: bool
 
     def autocast(self, device: torch.device) -> Any:
@@ -31,13 +31,17 @@ def resolve_precision(requested: str, device: torch.device) -> Precision:
             return Precision("fp32", None, False)
         if requested == "bf16":
             return Precision("bf16", torch.bfloat16, False)
-        raise ValueError("training.precision fp16 needs a CUDA GPU (use fp32 or bf16 on CPU)")
+        raise ValueError(
+            "training.precision fp16 needs a CUDA GPU (use fp32 or bf16 on CPU)"
+        )
     if requested == "auto":
         requested = "bf16" if bf16_supported(device) else "fp16"
     if requested == "bf16":
         if not bf16_supported(device):
-            raise ValueError(f"{torch.cuda.get_device_name(device)} does not support bf16; "
-                             f"use training.precision: fp16 or auto")
+            raise ValueError(
+                f"{torch.cuda.get_device_name(device)} does not support bf16; "
+                f"use training.precision: fp16 or auto"
+            )
         return Precision("bf16", torch.bfloat16, False)
     if requested == "fp16":
         return Precision("fp16", torch.float16, True)
@@ -56,16 +60,23 @@ def configure_backends(tf32: bool, device: torch.device) -> None:
         torch.set_float32_matmul_precision("high")
 
 
-def device_report(device: torch.device) -> List[str]:
-    lines = [f"torch {torch.__version__}" + (f", CUDA {torch.version.cuda}" if torch.version.cuda else "")]
+def device_report(device: torch.device) -> list[str]:
+    lines = [
+        f"torch {torch.__version__}"
+        + (f", CUDA {torch.version.cuda}" if torch.version.cuda else "")
+    ]
     if device.type != "cuda":
         lines.append(f"device: {device} (no CUDA GPU in use)")
         return lines
     props = torch.cuda.get_device_properties(device)
     free, total = torch.cuda.mem_get_info(device)
-    lines.append(f"GPU: {props.name} (compute capability {props.major}.{props.minor}, "
-                 f"{props.multi_processor_count} SMs)")
-    lines.append(f"VRAM: {total / 2**30:.2f} GiB total, {free / 2**30:.2f} GiB free at start")
+    lines.append(
+        f"GPU: {props.name} (compute capability {props.major}.{props.minor}, "
+        f"{props.multi_processor_count} SMs)"
+    )
+    lines.append(
+        f"VRAM: {total / 2**30:.2f} GiB total, {free / 2**30:.2f} GiB free at start"
+    )
     lines.append(f"bf16 supported: {bf16_supported(device)}")
     backends = []
     for name in ("flash", "mem_efficient", "math"):

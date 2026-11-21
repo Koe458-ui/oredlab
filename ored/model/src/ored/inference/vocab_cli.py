@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import argparse
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence
 
 from ored.data.tokenizer import Tokenizer
 from ored.inference.predictor import read_tokenizer, resolve_checkpoint
@@ -19,14 +19,13 @@ WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 
 @dataclass
 class VocabReport:
-
     text: str
     vocab_size: int
     symbols: str
     known_ratio: float
-    unknown_characters: List[str]
+    unknown_characters: list[str]
     min_known_ratio: float
-    unseen_words: Optional[List[str]] = None
+    unseen_words: list[str] | None = None
 
     @property
     def learnable(self) -> bool:
@@ -40,9 +39,13 @@ class VocabReport:
         ]
         if self.unseen_words is not None:
             lines.append(f"words not seen : {self.unseen_words or 'none'}")
-        verdict = "YES" if self.learnable else (
-            f"NO -- below {self.min_known_ratio:.0%}, the server skips it "
-            f"as outside the vocabulary"
+        verdict = (
+            "YES"
+            if self.learnable
+            else (
+                f"NO -- below {self.min_known_ratio:.0%}, the server skips it "
+                f"as outside the vocabulary"
+            )
         )
         lines.append(f"online learning: {verdict}")
         return "\n".join(lines)
@@ -58,24 +61,26 @@ def corpus_words(directory: str | Path, split: str = "train") -> set:
 def inspect(
     tokenizer: Tokenizer,
     text: str,
-    min_known_ratio: Optional[float] = None,
-    known_words: Optional[set] = None,
+    min_known_ratio: float | None = None,
+    known_words: set | None = None,
 ) -> VocabReport:
     if min_known_ratio is None:
         from ored.learning.online import OnlinePolicy
 
         min_known_ratio = OnlinePolicy().min_known_ratio
     ids = tokenizer.encode(text)
-    unknown = sorted({c for c in set(text) if not all(map(tokenizer.is_known, tokenizer.encode(c)))})
+    unknown = sorted(
+        {c for c in set(text) if not all(map(tokenizer.is_known, tokenizer.encode(c)))}
+    )
     ratio = sum(1 for i in ids if tokenizer.is_known(i)) / len(ids) if ids else 0.0
 
     unseen = None
     if known_words is not None:
-        unseen = sorted({
-            word for word in WORD_RE.findall(text) if word.lower() not in known_words
-        })
+        unseen = sorted(
+            {word for word in WORD_RE.findall(text) if word.lower() not in known_words}
+        )
 
-    symbols = "".join(s for s in getattr(tokenizer, "alphabet", tokenizer.itos[1:]) if s != "\n")
+    symbols = "".join(s for s in tokenizer.alphabet if s != "\n")
     return VocabReport(
         text=text,
         vocab_size=tokenizer.vocab_size,
@@ -94,19 +99,30 @@ def tokenizer_from_checkpoint(path: str | Path) -> Tokenizer:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Show what a checkpoint can read, and whether it would learn from a message.",
-        epilog='Examples:\n'
-               '  python scripts/vocab.py\n'
-               '  python scripts/vocab.py --text "what is a human ?"\n'
-               '  python scripts/vocab.py --text "What is a Human?" --text "17 + 9 = "',
+        epilog="Examples:\n"
+        "  python scripts/vocab.py\n"
+        '  python scripts/vocab.py --text "what is a human ?"\n'
+        '  python scripts/vocab.py --text "What is a Human?" --text "17 + 9 = "',
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--checkpoint", default=None)
-    parser.add_argument("--text", action="append", default=None, metavar="TEXT",
-                        help="a message to test; repeat for several")
-    parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR,
-                        help=f"corpus to check words against (default: {DEFAULT_CORPUS_DIR})")
-    parser.add_argument("--no-words", action="store_true",
-                        help="skip the word check and report characters only")
+    parser.add_argument(
+        "--text",
+        action="append",
+        default=None,
+        metavar="TEXT",
+        help="a message to test; repeat for several",
+    )
+    parser.add_argument(
+        "--corpus",
+        default=DEFAULT_CORPUS_DIR,
+        help=f"corpus to check words against (default: {DEFAULT_CORPUS_DIR})",
+    )
+    parser.add_argument(
+        "--no-words",
+        action="store_true",
+        help="skip the word check and report characters only",
+    )
     args = parser.parse_args(argv)
 
     checkpoint = resolve_checkpoint(args.checkpoint)
@@ -121,7 +137,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     logger.info(f"checkpoint : {checkpoint}")
     logger.info(f"tokenizer  : {tokenizer.describe()}")
     if known_words is not None:
-        logger.info(f"corpus     : {args.corpus}  ({len(known_words):,} distinct words)")
+        logger.info(
+            f"corpus     : {args.corpus}  ({len(known_words):,} distinct words)"
+        )
 
     for text in args.text or []:
         logger.info("")

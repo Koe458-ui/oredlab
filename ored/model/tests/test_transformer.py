@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import pytest
 import torch
-
 from ored.models.transformer import CausalSelfAttention, Transformer
 
 
 @pytest.fixture()
 def model():
     torch.manual_seed(0)
-    m = Transformer(vocab_size=20, block_size=16, d_model=32,
-                    n_layer=2, n_head=4, d_ff=64, dropout=0.0)
+    m = Transformer(
+        vocab_size=20,
+        block_size=16,
+        d_model=32,
+        n_layer=2,
+        n_head=4,
+        d_ff=64,
+        dropout=0.0,
+    )
     m.eval()
     return m
 
@@ -26,10 +32,12 @@ def test_future_tokens_cannot_influence_the_past(model):
     with torch.no_grad():
         after = model(changed)
 
-    assert torch.allclose(before[0, :position], after[0, :position], atol=1e-6), \
+    assert torch.allclose(before[0, :position], after[0, :position], atol=1e-6), (
         "a later token changed an earlier prediction: the causal mask is broken"
-    assert not torch.allclose(before[0, position], after[0, position], atol=1e-6), \
+    )
+    assert not torch.allclose(before[0, position], after[0, position], atol=1e-6), (
         "the changed position should change its own output"
+    )
 
 
 def test_every_future_position_is_masked(model):
@@ -42,8 +50,9 @@ def test_every_future_position_is_masked(model):
         changed[0, position] = (changed[0, position] + 3) % 20
         with torch.no_grad():
             out = model(changed)
-        assert torch.allclose(baseline[0, :position], out[0, :position], atol=1e-6), \
+        assert torch.allclose(baseline[0, :position], out[0, :position], atol=1e-6), (
             f"changing position {position} leaked backwards"
+        )
 
 
 def test_attention_weights_are_lower_triangular():
@@ -84,12 +93,26 @@ def test_d_model_must_divide_by_n_head():
 
 
 def test_weight_tying_shares_one_matrix():
-    tied = Transformer(vocab_size=20, block_size=8, d_model=16, n_layer=1,
-                       n_head=2, d_ff=32, tie_weights=True)
+    tied = Transformer(
+        vocab_size=20,
+        block_size=8,
+        d_model=16,
+        n_layer=1,
+        n_head=2,
+        d_ff=32,
+        tie_weights=True,
+    )
     assert tied.head.weight is tied.token_embedding.weight
 
-    untied = Transformer(vocab_size=20, block_size=8, d_model=16, n_layer=1,
-                         n_head=2, d_ff=32, tie_weights=False)
+    untied = Transformer(
+        vocab_size=20,
+        block_size=8,
+        d_model=16,
+        n_layer=1,
+        n_head=2,
+        d_ff=32,
+        tie_weights=False,
+    )
     assert untied.head.weight is not untied.token_embedding.weight
     assert untied.num_parameters() > tied.num_parameters()
 
@@ -99,7 +122,9 @@ def test_gradients_reach_every_parameter(model):
     ids = torch.randint(0, 20, (2, 8))
     targets = torch.randint(0, 20, (2, 8))
     logits = model(ids)
-    loss = torch.nn.functional.cross_entropy(logits.reshape(-1, 20), targets.reshape(-1))
+    loss = torch.nn.functional.cross_entropy(
+        logits.reshape(-1, 20), targets.reshape(-1)
+    )
     loss.backward()
 
     for name, param in model.named_parameters():
@@ -117,8 +142,15 @@ def test_position_embedding_makes_order_matter(model):
 
 
 def test_dropout_only_applies_in_training_mode():
-    m = Transformer(vocab_size=20, block_size=8, d_model=16, n_layer=1,
-                    n_head=2, d_ff=32, dropout=0.5)
+    m = Transformer(
+        vocab_size=20,
+        block_size=8,
+        d_model=16,
+        n_layer=1,
+        n_head=2,
+        d_ff=32,
+        dropout=0.5,
+    )
     ids = torch.randint(0, 20, (4, 8))
 
     m.eval()
@@ -131,4 +163,3 @@ def test_dropout_only_applies_in_training_mode():
     torch.manual_seed(2)
     second = m(ids)
     assert not torch.allclose(first, second)
-

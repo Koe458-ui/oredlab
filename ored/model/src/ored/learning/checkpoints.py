@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ored.learning.records import Checkpoint, CheckpointKind, CheckpointPart, now
 from ored.learning.store import StoreError
@@ -49,7 +49,7 @@ def digest(path: str | Path) -> str:
     return sha.hexdigest()
 
 
-def describe(path: str | Path) -> Dict[str, Any]:
+def describe(path: str | Path) -> dict[str, Any]:
     payload = load_checkpoint(path, map_location="cpu")
     return {
         "format_version": int(payload["format_version"]),
@@ -63,7 +63,6 @@ def describe(path: str | Path) -> Dict[str, Any]:
 
 
 class CheckpointStore:
-
     def __init__(
         self,
         url: str,
@@ -83,7 +82,7 @@ class CheckpointStore:
         self.max_object_bytes = max_object_bytes
 
     @classmethod
-    def from_env(cls) -> "CheckpointStore":
+    def from_env(cls) -> CheckpointStore:
         from ored.learning.r2 import R2Store, r2_configured
 
         url = os.environ.get("ORED_SB_URL", "")
@@ -98,10 +97,12 @@ class CheckpointStore:
         return cls(url, key, bucket, max_object_bytes=max_object_bytes_from_env())
 
     def _object_url(self, object_path: str) -> str:
-        quoted = "/".join(urllib.parse.quote(p) for p in object_path.strip("/").split("/"))
+        quoted = "/".join(
+            urllib.parse.quote(p) for p in object_path.strip("/").split("/")
+        )
         return f"{self.base}/object/{urllib.parse.quote(self.bucket)}/{quoted}"
 
-    def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    def _headers(self, extra: dict[str, str] | None = None) -> dict[str, str]:
         headers = {
             "apikey": self.service_key,
             "authorization": "Bearer " + self.service_key,
@@ -110,7 +111,13 @@ class CheckpointStore:
             headers.update(extra)
         return headers
 
-    def _send(self, method: str, url: str, data: Any = None, headers: Optional[Dict[str, str]] = None) -> bytes:
+    def _send(
+        self,
+        method: str,
+        url: str,
+        data: Any = None,
+        headers: dict[str, str] | None = None,
+    ) -> bytes:
         request = urllib.request.Request(
             url, data=data, method=method, headers=self._headers(headers)
         )
@@ -120,15 +127,23 @@ class CheckpointStore:
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")[:300]
             if exc.code == 409 or "Duplicate" in detail or "already exists" in detail:
-                raise ObjectExistsError(f"{method} {url} -> {exc.code} {detail}") from exc
-            if exc.code == 413 or "EntityTooLarge" in detail or "Payload too large" in detail:
+                raise ObjectExistsError(
+                    f"{method} {url} -> {exc.code} {detail}"
+                ) from exc
+            if (
+                exc.code == 413
+                or "EntityTooLarge" in detail
+                or "Payload too large" in detail
+            ):
                 raise StoreError(
                     f"{method} {url} -> {exc.code} {detail} (the project's per-file limit is lower "
                     f"than {self.max_object_bytes} bytes; lower ORED_SB_MAX_OBJECT_MB)"
                 ) from exc
             raise StoreError(f"{method} {url} -> {exc.code} {detail}") from exc
         except urllib.error.URLError as exc:
-            raise StoreError(f"{method} {url} could not be reached: {exc.reason}") from exc
+            raise StoreError(
+                f"{method} {url} could not be reached: {exc.reason}"
+            ) from exc
 
     def _put(self, object_path: str, data: bytes, upsert: bool) -> None:
         self._send(
@@ -141,11 +156,11 @@ class CheckpointStore:
             },
         )
 
-    def _entries(self, object_path: str) -> Tuple[Optional[int], List[Tuple[str, int]]]:
+    def _entries(self, object_path: str) -> tuple[int | None, list[tuple[str, int]]]:
         """Size of the whole object (None if absent) and its parts, in order."""
         folder, _, name = object_path.strip("/").rpartition("/")
-        whole: Optional[int] = None
-        parts: Dict[int, Tuple[str, int]] = {}
+        whole: int | None = None
+        parts: dict[int, tuple[str, int]] = {}
         for item in self._list(folder, name):
             if not item.get("id"):
                 continue
@@ -159,7 +174,9 @@ class CheckpointStore:
                 parts[int(match.group("index"))] = (path, size)
         return whole, [parts[i] for i in sorted(parts)]
 
-    def upload(self, path: str | Path, object_path: str, upsert: bool = False) -> Dict[str, Any]:
+    def upload(
+        self, path: str | Path, object_path: str, upsert: bool = False
+    ) -> dict[str, Any]:
         path = Path(path)
         if not path.is_file():
             raise StoreError(f"checkpoint not found: {path}")
@@ -179,7 +196,12 @@ class CheckpointStore:
                 for chunk in iter(lambda: handle.read(self.max_object_bytes), b""):
                     self._put(part_path(object_path, count), chunk, upsert)
                     count += 1
-            stale = [p for p, _ in old_parts if int(PART_SUFFIX.match(p).group("index")) >= count]
+            stale = [
+                p
+                for p, _ in old_parts
+                if (match := PART_SUFFIX.match(p))
+                and int(match.group("index")) >= count
+            ]
             if whole is not None:
                 stale.append(object_path)
             for extra in stale:
@@ -193,8 +215,9 @@ class CheckpointStore:
         whole, parts = self._entries(object_path)
         if whole is None and parts:
             with open(tmp, "wb") as handle:
-                for part, _ in parts:
-                    handle.write(self._send("GET", self._object_url(part)))
+                handle.writelines(
+                    self._send("GET", self._object_url(part)) for part, _ in parts
+                )
         else:
             tmp.write_bytes(self._send("GET", self._object_url(object_path)))
         tmp.replace(path)
@@ -207,14 +230,19 @@ class CheckpointStore:
         for part, _ in parts:
             self._send("DELETE", self._object_url(part))
 
-    def _list(self, prefix: str, search: str = "") -> List[Dict[str, Any]]:
-        items: List[Dict[str, Any]] = []
+    def _list(self, prefix: str, search: str = "") -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
         offset = 0
         while True:
-            body = json.dumps({
-                "prefix": prefix, "search": search, "limit": LIST_PAGE, "offset": offset,
-                "sortBy": {"column": "name", "order": "asc"},
-            }).encode("utf-8")
+            body = json.dumps(
+                {
+                    "prefix": prefix,
+                    "search": search,
+                    "limit": LIST_PAGE,
+                    "offset": offset,
+                    "sortBy": {"column": "name", "order": "asc"},
+                }
+            ).encode("utf-8")
             raw = self._send(
                 "POST",
                 f"{self.base}/object/list/{urllib.parse.quote(self.bucket)}",
@@ -227,7 +255,7 @@ class CheckpointStore:
                 return items
             offset += LIST_PAGE
 
-    def stat(self, object_path: str) -> Optional[int]:
+    def stat(self, object_path: str) -> int | None:
         whole, parts = self._entries(object_path)
         if whole is not None:
             return whole
@@ -235,8 +263,8 @@ class CheckpointStore:
             return sum(size for _, size in parts)
         return None
 
-    def list_objects(self, prefix: str = "") -> Dict[str, int]:
-        found: Dict[str, int] = {}
+    def list_objects(self, prefix: str = "") -> dict[str, int]:
+        found: dict[str, int] = {}
         for item in self._list(prefix.strip("/")):
             path = f"{prefix.strip('/')}/{item['name']}".strip("/")
             if item.get("id"):
@@ -261,7 +289,9 @@ def max_object_bytes_from_env() -> int:
     try:
         value = float(raw)
     except ValueError as exc:
-        raise StoreError(f"ORED_SB_MAX_OBJECT_MB must be a number, got {raw!r}") from exc
+        raise StoreError(
+            f"ORED_SB_MAX_OBJECT_MB must be a number, got {raw!r}"
+        ) from exc
     if value <= 0:
         raise StoreError(f"ORED_SB_MAX_OBJECT_MB must be positive, got {raw!r}")
     return int(value * 1024 * 1024)
@@ -271,7 +301,9 @@ def safe_name(run_name: str) -> str:
     return "".join(c if c.isalnum() or c in "-_" else "-" for c in (run_name or "run"))
 
 
-def object_path_for(kind: CheckpointKind, run_name: str, epoch: int = 0, global_step: int = 0) -> str:
+def object_path_for(
+    kind: CheckpointKind, run_name: str, epoch: int = 0, global_step: int = 0
+) -> str:
     kind = CheckpointKind(kind)
     run = safe_name(run_name)
     if kind is CheckpointKind.BASE:
@@ -284,21 +316,27 @@ def _with_suffix(object_path: str, n: int) -> str:
     return f"{stem}-{n}{dot}{ext}"
 
 
-def _row_for_path(store: Any, object_path: str) -> Optional[Checkpoint]:
+def _row_for_path(store: Any, object_path: str) -> Checkpoint | None:
     for record in store.checkpoints():
         if record.object_path == object_path:
             return record
     return None
 
 
-def _tempdir(workdir: Optional[str | Path]) -> tempfile.TemporaryDirectory:
+def _tempdir(workdir: str | Path | None) -> tempfile.TemporaryDirectory:
     if workdir is not None:
         Path(workdir).mkdir(parents=True, exist_ok=True)
     return tempfile.TemporaryDirectory(dir=workdir)
 
 
-def upload_verified(files: CheckpointStore, path: Path, object_path: str, sha256: str,
-                    rehash: bool = True, workdir: Optional[str | Path] = None) -> None:
+def upload_verified(
+    files: CheckpointStore,
+    path: Path,
+    object_path: str,
+    sha256: str,
+    rehash: bool = True,
+    workdir: str | Path | None = None,
+) -> None:
     size = path.stat().st_size
     try:
         files.upload(path, object_path, upsert=False)
@@ -310,12 +348,16 @@ def upload_verified(files: CheckpointStore, path: Path, object_path: str, sha256
         if stored is None:
             raise StoreError(f"{object_path} was uploaded but Storage cannot find it")
         if stored != size:
-            raise StoreError(f"{object_path} is {stored} bytes in Storage, {size} locally")
+            raise StoreError(
+                f"{object_path} is {stored} bytes in Storage, {size} locally"
+            )
         if rehash:
             with _tempdir(workdir) as tmp:
                 landed = files.download(object_path, Path(tmp) / "check.pt")
                 if digest(landed) != sha256:
-                    raise StoreError(f"{object_path} failed its sha256 check after upload")
+                    raise StoreError(
+                        f"{object_path} failed its sha256 check after upload"
+                    )
     except StoreError:
         try:
             files.remove(object_path)
@@ -330,18 +372,18 @@ def publish(
     path: str | Path,
     kind: CheckpointKind = CheckpointKind.BEST,
     run_name: str = "",
-    version_id: Optional[str] = None,
-    session_id: Optional[str] = None,
-    uploaded_by: Optional[str] = None,
+    version_id: str | None = None,
+    session_id: str | None = None,
+    uploaded_by: str | None = None,
     *,
-    make_current: Optional[bool] = None,
-    parent_id: Optional[str] = None,
-    rule: Optional[PromotionRule] = None,
+    make_current: bool | None = None,
+    parent_id: str | None = None,
+    rule: PromotionRule | None = None,
     force: bool = False,
     rehash: bool = True,
     prune_superseded: bool = True,
-    workdir: Optional[str | Path] = None,
-    object_path: Optional[str] = None,
+    workdir: str | Path | None = None,
+    object_path: str | None = None,
 ) -> Checkpoint:
     kind = CheckpointKind(kind)
     path = Path(path)
@@ -359,7 +401,9 @@ def publish(
     sha256 = digest(path)
     size = path.stat().st_size
 
-    object_path = object_path or object_path_for(kind, run_name, meta["epoch"], meta["global_step"])
+    object_path = object_path or object_path_for(
+        kind, run_name, meta["epoch"], meta["global_step"]
+    )
     candidate, n = object_path, 1
     while True:
         existing = _row_for_path(store, candidate)
@@ -376,7 +420,12 @@ def publish(
         raise StoreError(
             f"run {run_name} already has a base checkpoint ({current.object_path}); base is immutable"
         )
-    if kind is CheckpointKind.BEST and make_current and current is not None and not force:
+    if (
+        kind is CheckpointKind.BEST
+        and make_current
+        and current is not None
+        and not force
+    ):
         new_value, old_value = rule.value(meta["metrics"]), rule.value(current.metrics)
         if not rule.is_better(new_value, old_value):
             raise NotBetterError(
@@ -418,13 +467,15 @@ def publish(
         raise
 
     if kind is CheckpointKind.LIVE and prune_superseded:
-        for old in store.checkpoints(CheckpointKind.LIVE, run_name=run_name, current=False):
+        for old in store.checkpoints(
+            CheckpointKind.LIVE, run_name=run_name, current=False
+        ):
             if old.part is CheckpointPart.FILE:
                 delete_checkpoint(store, files, old.id)
     return record
 
 
-def _num(value: Optional[float]) -> str:
+def _num(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.5f}"
 
 
@@ -433,13 +484,13 @@ def promote_best(
     files: CheckpointStore,
     path: str | Path,
     run_name: str = "",
-    rule: Optional[PromotionRule] = None,
+    rule: PromotionRule | None = None,
     *,
     force: bool = False,
-    parent_id: Optional[str] = None,
-    workdir: Optional[str | Path] = None,
+    parent_id: str | None = None,
+    workdir: str | Path | None = None,
     **publish_args: Any,
-) -> Tuple[Optional[Checkpoint], str]:
+) -> tuple[Checkpoint | None, str]:
     rule = rule or PromotionRule()
     payload = load_checkpoint(path, map_location="cpu")
     if rule.value(payload.get("metrics")) is None and not force:
@@ -451,24 +502,35 @@ def promote_best(
             source = write_payload(Path(tmp) / "best.pt", as_kind(payload, "best"))
         try:
             record = publish(
-                store, files, source, CheckpointKind.BEST, run_name or payload.get("run_name", ""),
-                rule=rule, force=force, parent_id=parent_id, workdir=workdir, **publish_args,
+                store,
+                files,
+                source,
+                CheckpointKind.BEST,
+                run_name or payload.get("run_name", ""),
+                rule=rule,
+                force=force,
+                parent_id=parent_id,
+                workdir=workdir,
+                **publish_args,
             )
         except NotBetterError as exc:
             return None, str(exc)
     value = rule.value(record.metrics)
-    return record, f"promoted to best: {rule.metric} {_num(value)} (epoch {record.epoch})"
+    return (
+        record,
+        f"promoted to best: {rule.metric} {_num(value)} (epoch {record.epoch})",
+    )
 
 
 def promote_existing_best(
     store: Any,
     files: CheckpointStore,
     checkpoint_id: str,
-    rule: Optional[PromotionRule] = None,
+    rule: PromotionRule | None = None,
     *,
     force: bool = False,
-    workdir: Optional[str | Path] = None,
-) -> Tuple[Optional[Checkpoint], str]:
+    workdir: str | Path | None = None,
+) -> tuple[Checkpoint | None, str]:
     rule = rule or PromotionRule()
     source = store.checkpoint(checkpoint_id)
     if source is None:
@@ -477,8 +539,12 @@ def promote_existing_best(
         if source.is_current:
             return source, "already the current best"
         current = store.current_checkpoint(source.run_name, CheckpointKind.BEST)
-        if current is not None and not force and not rule.is_better(
-            rule.value(source.metrics), rule.value(current.metrics)
+        if (
+            current is not None
+            and not force
+            and not rule.is_better(
+                rule.value(source.metrics), rule.value(current.metrics)
+            )
         ):
             return None, (
                 f"not promoted: {rule.metric} {_num(rule.value(source.metrics))} does not beat "
@@ -491,9 +557,16 @@ def promote_existing_best(
     with _tempdir(workdir) as tmp:
         landed = fetch_record(files, source, Path(tmp) / "source.pt")
         return promote_best(
-            store, files, landed, source.run_name, rule,
-            force=force, parent_id=source.id, workdir=workdir,
-            version_id=source.version_id, session_id=source.session_id,
+            store,
+            files,
+            landed,
+            source.run_name,
+            rule,
+            force=force,
+            parent_id=source.id,
+            workdir=workdir,
+            version_id=source.version_id,
+            session_id=source.session_id,
         )
 
 
@@ -502,12 +575,14 @@ def export_checkpoint(
     files: CheckpointStore,
     run_name: str,
     source_kind: CheckpointKind = CheckpointKind.BEST,
-    local_copy: Optional[str | Path] = None,
-    workdir: Optional[str | Path] = None,
+    local_copy: str | Path | None = None,
+    workdir: str | Path | None = None,
 ) -> Checkpoint:
     source = store.current_checkpoint(run_name, source_kind)
     if source is None:
-        raise StoreError(f"run {run_name} has no current {CheckpointKind(source_kind).value} checkpoint to export")
+        raise StoreError(
+            f"run {run_name} has no current {CheckpointKind(source_kind).value} checkpoint to export"
+        )
     with _tempdir(workdir) as tmp:
         landed = fetch_record(files, source, Path(tmp) / "source.pt")
         exported = write_payload(
@@ -515,9 +590,15 @@ def export_checkpoint(
             as_kind(load_checkpoint(landed), "export"),
         )
         return publish(
-            store, files, exported, CheckpointKind.EXPORT, run_name,
-            version_id=source.version_id, session_id=source.session_id,
-            parent_id=source.id, workdir=workdir,
+            store,
+            files,
+            exported,
+            CheckpointKind.EXPORT,
+            run_name,
+            version_id=source.version_id,
+            session_id=source.session_id,
+            parent_id=source.id,
+            workdir=workdir,
         )
 
 
@@ -536,9 +617,11 @@ def fetch_record(files: CheckpointStore, record: Checkpoint, path: str | Path) -
     return path
 
 
-def find(store: Any, kind: CheckpointKind, run_name: str = "") -> Optional[Checkpoint]:
+def find(store: Any, kind: CheckpointKind, run_name: str = "") -> Checkpoint | None:
     kind = CheckpointKind(kind)
-    found: List[Checkpoint] = store.checkpoints(kind, run_name=run_name or None, logical=True)
+    found: list[Checkpoint] = store.checkpoints(
+        kind, run_name=run_name or None, logical=True
+    )
     if not found:
         return None
     current = [c for c in found if c.is_current]
@@ -551,7 +634,7 @@ def fetch(
     path: str | Path,
     kind: CheckpointKind = CheckpointKind.BEST,
     run_name: str = "",
-) -> Optional[Checkpoint]:
+) -> Checkpoint | None:
     record = find(store, kind, run_name)
     if record is None:
         return None
@@ -561,22 +644,22 @@ def fetch(
 
 @dataclass
 class VerifyReport:
-
     record: Checkpoint
     exists: bool = False
     size_ok: bool = False
     sha_ok: bool = False
     loads: bool = False
-    problems: List[str] = field(default_factory=list)
+    problems: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
         return self.exists and self.size_ok and self.sha_ok and self.loads
 
-    def raise_for_failure(self) -> "VerifyReport":
+    def raise_for_failure(self) -> VerifyReport:
         if not self.ok:
             raise StoreError(
-                f"checkpoint {self.record.object_path} failed verification: " + "; ".join(self.problems)
+                f"checkpoint {self.record.object_path} failed verification: "
+                + "; ".join(self.problems)
             )
         return self
 
@@ -585,7 +668,7 @@ def verify_checkpoint(
     store: Any,
     files: CheckpointStore,
     record: Checkpoint,
-    workdir: Optional[str | Path] = None,
+    workdir: str | Path | None = None,
     load: bool = True,
 ) -> VerifyReport:
     report = VerifyReport(record)
@@ -624,18 +707,21 @@ def verify_checkpoint(
 
 @dataclass
 class DuplicateGroup:
-
     sha256: str
     canonical: Checkpoint
-    extras: List[Checkpoint]
+    extras: list[Checkpoint]
 
     @property
     def reclaimable_bytes(self) -> int:
-        return sum(r.size_bytes for r in self.extras if r.object_path != self.canonical.object_path)
+        return sum(
+            r.size_bytes
+            for r in self.extras
+            if r.object_path != self.canonical.object_path
+        )
 
 
-def find_duplicates(store: Any) -> List[DuplicateGroup]:
-    by_sha: Dict[str, List[Checkpoint]] = {}
+def find_duplicates(store: Any) -> list[DuplicateGroup]:
+    by_sha: dict[str, list[Checkpoint]] = {}
     for record in store.checkpoints():
         if record.sha256 and record.part is CheckpointPart.FILE:
             by_sha.setdefault(record.sha256, []).append(record)
@@ -643,13 +729,16 @@ def find_duplicates(store: Any) -> List[DuplicateGroup]:
     for sha, records in by_sha.items():
         if len(records) < 2:
             continue
-        ordered = sorted(records, key=lambda r: (not r.is_current, str(r.created_at), r.id))
+        ordered = sorted(
+            records, key=lambda r: (not r.is_current, str(r.created_at), r.id)
+        )
         groups.append(DuplicateGroup(sha, ordered[0], ordered[1:]))
     return sorted(groups, key=lambda g: str(g.canonical.created_at))
 
 
-def delete_checkpoint(store: Any, files: CheckpointStore, checkpoint_id: str,
-                      allow_current: bool = False) -> Checkpoint:
+def delete_checkpoint(
+    store: Any, files: CheckpointStore, checkpoint_id: str, allow_current: bool = False
+) -> Checkpoint:
     target = store.checkpoint(checkpoint_id)
     if target is not None and target.part is not CheckpointPart.FILE:
         rows = store.group(target.checkpoint_group_id)
@@ -670,7 +759,9 @@ def _remove_quietly(files: CheckpointStore, object_path: str) -> None:
         pass
 
 
-def remove_duplicates(store: Any, files: CheckpointStore, apply: bool = False) -> List[Checkpoint]:
+def remove_duplicates(
+    store: Any, files: CheckpointStore, apply: bool = False
+) -> list[Checkpoint]:
     doomed = [r for g in find_duplicates(store) for r in g.extras if not r.is_current]
     if apply:
         for record in doomed:
@@ -678,8 +769,13 @@ def remove_duplicates(store: Any, files: CheckpointStore, apply: bool = False) -
     return doomed
 
 
-def prune_history(store: Any, files: CheckpointStore, run_name: str, keep_last: int,
-                  apply: bool = False) -> List[Checkpoint]:
+def prune_history(
+    store: Any,
+    files: CheckpointStore,
+    run_name: str,
+    keep_last: int,
+    apply: bool = False,
+) -> list[Checkpoint]:
     if keep_last < 0:
         raise ValueError("keep_last must be >= 0")
     history = sorted(
@@ -693,6 +789,6 @@ def prune_history(store: Any, files: CheckpointStore, run_name: str, keep_last: 
     return doomed
 
 
-def orphans(store: Any, files: CheckpointStore, prefix: str = "") -> Dict[str, int]:
+def orphans(store: Any, files: CheckpointStore, prefix: str = "") -> dict[str, int]:
     recorded = {r.object_path for r in store.checkpoints()}
     return {p: s for p, s in files.list_objects(prefix).items() if p not in recorded}

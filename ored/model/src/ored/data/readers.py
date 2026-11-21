@@ -4,9 +4,10 @@ import gzip
 import hashlib
 import io
 import json
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, BinaryIO
 
 GZIP_MAGIC = b"\x1f\x8b"
 ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
@@ -22,15 +23,15 @@ class ReaderError(ValueError):
 
 @dataclass
 class Document:
-    id: Optional[str]
+    id: str | None
     text: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class FileFormat:
-    format: Optional[str]
-    compression: Optional[str]
+    format: str | None
+    compression: str | None
 
     def describe(self) -> str:
         return f"{self.format or 'unknown'}{'+' + self.compression if self.compression else ''}"
@@ -43,7 +44,9 @@ def detect_format(path: str | Path) -> FileFormat:
     suffixes = [s.lower() for s in path.suffixes]
     if head == PARQUET_MAGIC:
         return FileFormat("parquet", None)
-    compression = "gzip" if head[:2] == GZIP_MAGIC else "zstd" if head == ZSTD_MAGIC else None
+    compression = (
+        "gzip" if head[:2] == GZIP_MAGIC else "zstd" if head == ZSTD_MAGIC else None
+    )
     inner = [s for s in suffixes if s not in (".gz", ".zst", ".zstd")]
     fmt = None
     if inner and inner[-1] in (".jsonl", ".ndjson", ".json"):
@@ -53,36 +56,47 @@ def detect_format(path: str | Path) -> FileFormat:
     return FileFormat(fmt, compression)
 
 
-def _open_binary(path: Path, compression: Optional[str]) -> BinaryIO:
+def _open_binary(path: Path, compression: str | None) -> BinaryIO:
     if compression is None:
         return open(path, "rb")
     if compression == "gzip":
-        return gzip.open(path, "rb")
+        return io.BufferedReader(gzip.open(path, "rb"))
     if compression == "zstd":
         try:
             import zstandard
         except ImportError as exc:
-            raise ReaderError(f"{path.name} is zstd-compressed: pip install zstandard "
-                              f"(optional dependency, see pyproject extras 'corpus')") from exc
-        raw = open(path, "rb")
-        return io.BufferedReader(zstandard.ZstdDecompressor().stream_reader(
-            raw, read_across_frames=True, closefd=True))
+            raise ReaderError(
+                f"{path.name} is zstd-compressed: pip install zstandard "
+                f"(optional dependency, see pyproject extras 'corpus')"
+            ) from exc
+        raw = open(path, "rb")  # noqa: SIM115 -- the owning stream or writer closes this handle
+        return io.BufferedReader(
+            zstandard.ZstdDecompressor().stream_reader(
+                raw, read_across_frames=True, closefd=True
+            )
+        )
     raise ReaderError(f"unsupported compression {compression!r}")
 
 
 class DatasetReader:
-
-    def __init__(self, path: str | Path, text_field: str, id_field: Optional[str] = None,
-                 metadata_fields: Sequence[str] = ()) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        text_field: str,
+        id_field: str | None = None,
+        metadata_fields: Sequence[str] = (),
+    ) -> None:
         if not text_field:
-            raise ReaderError("a reader needs text_field: the field that holds each document's text")
+            raise ReaderError(
+                "a reader needs text_field: the field that holds each document's text"
+            )
         self.path = Path(path)
         self.text_field = text_field
         self.id_field = id_field
         self.metadata_fields = list(metadata_fields)
         self.skipped = 0
 
-    def _records(self) -> Iterator[Dict[str, Any]]:
+    def _records(self) -> Iterator[dict[str, Any]]:
         raise NotImplementedError
 
     def iter_documents(self) -> Iterator[Document]:
@@ -93,7 +107,9 @@ class DatasetReader:
                 continue
             doc_id = _field(record, self.id_field) if self.id_field else None
             if self.id_field and doc_id is None:
-                raise ReaderError(f"{self.path.name} record {number} has no {self.id_field!r}")
+                raise ReaderError(
+                    f"{self.path.name} record {number} has no {self.id_field!r}"
+                )
             metadata = {name: _field(record, name) for name in self.metadata_fields}
             yield Document(None if doc_id is None else str(doc_id), text, metadata)
 
@@ -101,7 +117,7 @@ class DatasetReader:
         return self.iter_documents()
 
 
-def _field(record: Dict[str, Any], dotted: Optional[str]) -> Any:
+def _field(record: dict[str, Any], dotted: str | None) -> Any:
     value: Any = record
     for part in (dotted or "").split("."):
         if not isinstance(value, dict) or part not in value:
@@ -111,14 +127,25 @@ def _field(record: Dict[str, Any], dotted: Optional[str]) -> Any:
 
 
 class JsonlReader(DatasetReader):
-
-    def __init__(self, path: str | Path, text_field: str, id_field: Optional[str] = None,
-                 metadata_fields: Sequence[str] = (), compression: Optional[str] = "detect",
-                 byte_range: Optional[Tuple[int, int]] = None) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        text_field: str,
+        id_field: str | None = None,
+        metadata_fields: Sequence[str] = (),
+        compression: str | None = "detect",
+        byte_range: tuple[int, int] | None = None,
+    ) -> None:
         super().__init__(path, text_field, id_field, metadata_fields)
-        self.compression = detect_format(self.path).compression if compression == "detect" else compression
+        self.compression = (
+            detect_format(self.path).compression
+            if compression == "detect"
+            else compression
+        )
         if byte_range is not None and self.compression is not None:
-            raise ReaderError(f"{self.path.name} is compressed: it cannot be read in byte ranges")
+            raise ReaderError(
+                f"{self.path.name} is compressed: it cannot be read in byte ranges"
+            )
         self.byte_range = byte_range
 
     def _lines(self, handle: BinaryIO) -> Iterator[bytes]:
@@ -135,7 +162,7 @@ class JsonlReader(DatasetReader):
             position += len(line)
             yield line
 
-    def _records(self) -> Iterator[Dict[str, Any]]:
+    def _records(self) -> Iterator[dict[str, Any]]:
         with _open_binary(self.path, self.compression) as handle:
             for number, line in enumerate(self._lines(handle), start=1):
                 if not line.strip():
@@ -143,54 +170,81 @@ class JsonlReader(DatasetReader):
                 try:
                     record = json.loads(line)
                 except ValueError as exc:
-                    raise ReaderError(f"{self.path.name} line {number} is not JSON: {exc}") from exc
+                    raise ReaderError(
+                        f"{self.path.name} line {number} is not JSON: {exc}"
+                    ) from exc
                 if not isinstance(record, dict):
-                    raise ReaderError(f"{self.path.name} line {number} is not a JSON object")
+                    raise ReaderError(
+                        f"{self.path.name} line {number} is not a JSON object"
+                    )
                 yield record
 
 
 class ParquetReader(DatasetReader):
-
-    def __init__(self, path: str | Path, text_field: str, id_field: Optional[str] = None,
-                 metadata_fields: Sequence[str] = (), batch_size: int = 1024) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        text_field: str,
+        id_field: str | None = None,
+        metadata_fields: Sequence[str] = (),
+        batch_size: int = 1024,
+    ) -> None:
         super().__init__(path, text_field, id_field, metadata_fields)
         self.batch_size = batch_size
 
-    def _records(self) -> Iterator[Dict[str, Any]]:
+    def _records(self) -> Iterator[dict[str, Any]]:
         parquet = _pyarrow_parquet(self.path)
-        top = {f.split(".")[0] for f in [self.text_field, self.id_field, *self.metadata_fields] if f}
-        for batch in parquet.ParquetFile(self.path).iter_batches(batch_size=self.batch_size,
-                                                                 columns=sorted(top)):
+        top = {
+            f.split(".")[0]
+            for f in [self.text_field, self.id_field, *self.metadata_fields]
+            if f
+        }
+        for batch in parquet.ParquetFile(self.path).iter_batches(
+            batch_size=self.batch_size, columns=sorted(top)
+        ):
             yield from batch.to_pylist()
 
 
 def _pyarrow_parquet(path: Path) -> Any:
     try:
-        import pyarrow.parquet as parquet
+        from pyarrow import parquet
     except ImportError as exc:
-        raise ReaderError(f"{path.name} is Parquet: install pyarrow (pip install -r requirements.txt)") from exc
+        raise ReaderError(
+            f"{path.name} is Parquet: install pyarrow (pip install -r requirements.txt)"
+        ) from exc
     return parquet
 
 
 READERS = {"jsonl": JsonlReader, "parquet": ParquetReader}
 
 
-def open_reader(path: str | Path, text_field: str, id_field: Optional[str] = None,
-                metadata_fields: Sequence[str] = (), file_format: Optional[str] = None,
-                byte_range: Optional[Tuple[int, int]] = None) -> DatasetReader:
+def open_reader(
+    path: str | Path,
+    text_field: str,
+    id_field: str | None = None,
+    metadata_fields: Sequence[str] = (),
+    file_format: str | None = None,
+    byte_range: tuple[int, int] | None = None,
+) -> DatasetReader:
     detected = detect_format(path)
     fmt = file_format or detected.format
     if fmt not in READERS:
-        raise ReaderError(f"cannot tell how to read {Path(path).name} (detected {detected.describe()}); "
-                          f"pass the format explicitly: one of {', '.join(READERS)}")
+        raise ReaderError(
+            f"cannot tell how to read {Path(path).name} (detected {detected.describe()}); "
+            f"pass the format explicitly: one of {', '.join(READERS)}"
+        )
     if byte_range is not None:
         if fmt != "jsonl":
-            raise ReaderError(f"only uncompressed JSONL can be read in byte ranges, not {fmt}")
-        return JsonlReader(path, text_field, id_field, metadata_fields, byte_range=byte_range)
+            raise ReaderError(
+                f"only uncompressed JSONL can be read in byte ranges, not {fmt}"
+            )
+        return JsonlReader(
+            path, text_field, id_field, metadata_fields, byte_range=byte_range
+        )
     return READERS[fmt](path, text_field, id_field, metadata_fields)
 
 
-def line_chunks(path: str | Path, chunk_bytes: int) -> List[Tuple[int, int]]:
+def line_chunks(path: str | Path, chunk_bytes: int) -> list[tuple[int, int]]:
     path = Path(path)
     size = path.stat().st_size
     if chunk_bytes <= 0 or size <= chunk_bytes:
@@ -218,14 +272,19 @@ def file_sha256(path: str | Path, chunk: int = 4 * 1024 * 1024) -> str:
     return sha.hexdigest()
 
 
-def inspect_file(path: str | Path, max_records: int = 5) -> Dict[str, Any]:
+def inspect_file(path: str | Path, max_records: int = 5) -> dict[str, Any]:
     path = Path(path)
     detected = detect_format(path)
-    report: Dict[str, Any] = {"file_name": path.name, "size_bytes": path.stat().st_size,
-                              "file_format": detected.format, "compression": detected.compression,
-                              "records_sampled": 0, "fields": {}}
+    report: dict[str, Any] = {
+        "file_name": path.name,
+        "size_bytes": path.stat().st_size,
+        "file_format": detected.format,
+        "compression": detected.compression,
+        "records_sampled": 0,
+        "fields": {},
+    }
     if detected.format == "jsonl":
-        records: List[Dict[str, Any]] = []
+        records: list[dict[str, Any]] = []
         with _open_binary(path, detected.compression) as handle:
             for line in handle:
                 if line.strip():
@@ -243,12 +302,12 @@ def inspect_file(path: str | Path, max_records: int = 5) -> Dict[str, Any]:
         handle = parquet.ParquetFile(path)
         report["parquet_rows"] = handle.metadata.num_rows
         report["parquet_schema"] = [f"{f.name}: {f.type}" for f in handle.schema_arrow]
-        records = next(handle.iter_batches(batch_size=max_records), None)
-        records = records.to_pylist() if records is not None else []
+        batch = next(handle.iter_batches(batch_size=max_records), None)
+        records = batch.to_pylist() if batch is not None else []
     else:
         records = []
     report["records_sampled"] = len(records)
-    fields: Dict[str, set] = {}
+    fields: dict[str, set] = {}
     for record in records:
         for key, value in _flatten(record).items():
             fields.setdefault(key, set()).add(type(value).__name__)
@@ -256,8 +315,10 @@ def inspect_file(path: str | Path, max_records: int = 5) -> Dict[str, Any]:
     return report
 
 
-def _flatten(record: Dict[str, Any], prefix: str = "", depth: int = 2) -> Dict[str, Any]:
-    out: Dict[str, Any] = {}
+def _flatten(
+    record: dict[str, Any], prefix: str = "", depth: int = 2
+) -> dict[str, Any]:
+    out: dict[str, Any] = {}
     for key, value in record.items():
         name = f"{prefix}{key}"
         if isinstance(value, dict) and depth > 0:

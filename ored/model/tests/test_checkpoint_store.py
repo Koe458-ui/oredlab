@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import torch
-
-from ored.learning import CheckpointKind, InMemoryStore, StaleCheckpointError, StoreError
-from ored.learning.checkpoint_cli import card, main as cli_main
+from ored.learning import (
+    CheckpointKind,
+    InMemoryStore,
+    StaleCheckpointError,
+    StoreError,
+)
+from ored.learning.checkpoint_cli import card
+from ored.learning.checkpoint_cli import main as cli_main
 from ored.learning.checkpoints import (
     CheckpointStore,
     NotBetterError,
@@ -25,16 +32,23 @@ from ored.learning.checkpoints import (
     verify_checkpoint,
 )
 from ored.learning.records import Checkpoint
-from ored.utils.checkpoint import CheckpointError, PromotionRule, load_checkpoint, save_checkpoint
+from ored.utils.checkpoint import (
+    CheckpointError,
+    PromotionRule,
+    load_checkpoint,
+    save_checkpoint,
+)
 
 LIVE, BEST, HISTORY, BASE, EXPORT = (
-    CheckpointKind.LIVE, CheckpointKind.BEST, CheckpointKind.HISTORY,
-    CheckpointKind.BASE, CheckpointKind.EXPORT,
+    CheckpointKind.LIVE,
+    CheckpointKind.BEST,
+    CheckpointKind.HISTORY,
+    CheckpointKind.BASE,
+    CheckpointKind.EXPORT,
 )
 
 
 class FakeBucket(CheckpointStore):
-
     def __init__(self, bucket="ored-checkpoints"):
         self.bucket = bucket
         self.objects = {}
@@ -44,13 +58,17 @@ class FakeBucket(CheckpointStore):
     def upload(self, path, object_path, upsert=False):
         if object_path in self.objects and not upsert:
             raise ObjectExistsError(f"{object_path} exists")
-        data = open(path, "rb").read()
+        data = Path(path).read_bytes()
         if self.damage == "corrupt":
             data = data[:-1] + bytes([data[-1] ^ 0xFF])
         elif self.damage == "truncate":
             data = data[: len(data) // 2]
         self.objects[object_path] = data
-        return {"object_path": object_path, "size_bytes": len(data), "sha256": digest(path)}
+        return {
+            "object_path": object_path,
+            "size_bytes": len(data),
+            "sha256": digest(path),
+        }
 
     def download(self, object_path, path):
         if object_path not in self.objects:
@@ -71,7 +89,9 @@ class FakeBucket(CheckpointStore):
         return {p: len(d) for p, d in self.objects.items() if p.startswith(prefix)}
 
 
-def a_checkpoint(tmp_path, name="ckpt.pt", epoch=3, step=30, val_loss=0.25, kind="live", run="unit"):
+def a_checkpoint(
+    tmp_path, name="ckpt.pt", epoch=3, step=30, val_loss=0.25, kind="live", run="unit"
+):
     torch.manual_seed(epoch * 1000 + step)
     return save_checkpoint(
         path=tmp_path / name,
@@ -99,10 +119,22 @@ def test_needs_a_url_and_a_key():
 
 def test_object_paths_are_deterministic_and_readable():
     assert object_path_for(BASE, "ored_v2") == "ored_v2/base/base.pt"
-    assert object_path_for(LIVE, "ored_v2", 30, 73710) == "ored_v2/live/epoch_0030_step_00073710.pt"
-    assert object_path_for(BEST, "ored_v2", 20, 49140) == "ored_v2/best/epoch_0020_step_00049140.pt"
-    assert object_path_for(HISTORY, "ored_v2", 10, 24570) == "ored_v2/history/epoch_0010_step_00024570.pt"
-    assert object_path_for(EXPORT, "ored_v2", 20, 49140) == "ored_v2/export/epoch_0020_step_00049140.pt"
+    assert (
+        object_path_for(LIVE, "ored_v2", 30, 73710)
+        == "ored_v2/live/epoch_0030_step_00073710.pt"
+    )
+    assert (
+        object_path_for(BEST, "ored_v2", 20, 49140)
+        == "ored_v2/best/epoch_0020_step_00049140.pt"
+    )
+    assert (
+        object_path_for(HISTORY, "ored_v2", 10, 24570)
+        == "ored_v2/history/epoch_0010_step_00024570.pt"
+    )
+    assert (
+        object_path_for(EXPORT, "ored_v2", 20, 49140)
+        == "ored_v2/export/epoch_0020_step_00049140.pt"
+    )
 
 
 def test_object_path_is_safe():
@@ -165,10 +197,20 @@ def test_a_damaged_upload_is_never_recorded(tmp_path, env, damage):
 
 def test_a_damaged_best_does_not_replace_the_good_one(tmp_path, env):
     store, files = env
-    good = publish(store, files, a_checkpoint(tmp_path, "a.pt", val_loss=0.5, kind="best"), kind=BEST)
+    good = publish(
+        store,
+        files,
+        a_checkpoint(tmp_path, "a.pt", val_loss=0.5, kind="best"),
+        kind=BEST,
+    )
     files.damage = "corrupt"
     with pytest.raises(StoreError):
-        publish(store, files, a_checkpoint(tmp_path, "b.pt", epoch=4, val_loss=0.1, kind="best"), kind=BEST)
+        publish(
+            store,
+            files,
+            a_checkpoint(tmp_path, "b.pt", epoch=4, val_loss=0.1, kind="best"),
+            kind=BEST,
+        )
     assert store.current_checkpoint("unit", BEST) is good
 
 
@@ -247,8 +289,13 @@ def test_publishing_live_replaces_the_previous_one(tmp_path, env):
 def test_superseded_live_can_be_kept(tmp_path, env):
     store, files = env
     first = publish(store, files, a_checkpoint(tmp_path, "a.pt", step=10), kind=LIVE)
-    second = publish(store, files, a_checkpoint(tmp_path, "b.pt", step=20), kind=LIVE,
-                     prune_superseded=False)
+    second = publish(
+        store,
+        files,
+        a_checkpoint(tmp_path, "b.pt", step=20),
+        kind=LIVE,
+        prune_superseded=False,
+    )
     assert [c.is_current for c in store.checkpoints(LIVE)] == [False, True]
     assert store.current_checkpoint("unit", LIVE) is second
     assert first.object_path in files.objects
@@ -264,9 +311,22 @@ def test_each_run_has_its_own_live(tmp_path, env):
 
 def test_a_resaved_live_at_the_same_step_gets_its_own_name(tmp_path, env):
     store, files = env
-    publish(store, files, a_checkpoint(tmp_path, "a.pt", step=10), kind=LIVE, prune_superseded=False)
-    again = save_checkpoint(tmp_path / "b.pt", torch.nn.Linear(4, 2), {"run_name": "unit"}, 3,
-                            {"val_loss": 0.3}, kind="live", global_step=10)
+    publish(
+        store,
+        files,
+        a_checkpoint(tmp_path, "a.pt", step=10),
+        kind=LIVE,
+        prune_superseded=False,
+    )
+    again = save_checkpoint(
+        tmp_path / "b.pt",
+        torch.nn.Linear(4, 2),
+        {"run_name": "unit"},
+        3,
+        {"val_loss": 0.3},
+        kind="live",
+        global_step=10,
+    )
     record = publish(store, files, again, kind=LIVE, prune_superseded=False)
     assert record.object_path == "unit/live/epoch_0003_step_00000010-2.pt"
 
@@ -281,47 +341,93 @@ def test_runs_whose_names_share_a_folder_never_overwrite_each_other(tmp_path, en
 
 def test_best_is_promoted_only_when_better(tmp_path, env):
     store, files = env
-    first = publish(store, files, a_checkpoint(tmp_path, "a.pt", 10, 100, 0.50, "best"), kind=BEST)
-    assert first.is_current and first.promotion_metric == "val_loss" and first.promotion_mode == "min"
+    first = publish(
+        store, files, a_checkpoint(tmp_path, "a.pt", 10, 100, 0.50, "best"), kind=BEST
+    )
+    assert (
+        first.is_current
+        and first.promotion_metric == "val_loss"
+        and first.promotion_mode == "min"
+    )
 
     with pytest.raises(NotBetterError, match="does not beat"):
-        publish(store, files, a_checkpoint(tmp_path, "b.pt", 20, 200, 0.60, "best"), kind=BEST)
+        publish(
+            store,
+            files,
+            a_checkpoint(tmp_path, "b.pt", 20, 200, 0.60, "best"),
+            kind=BEST,
+        )
     assert store.current_checkpoint("unit", BEST) is first
 
-    better = publish(store, files, a_checkpoint(tmp_path, "c.pt", 30, 300, 0.40, "best"), kind=BEST)
+    better = publish(
+        store, files, a_checkpoint(tmp_path, "c.pt", 30, 300, 0.40, "best"), kind=BEST
+    )
     assert store.current_checkpoint("unit", BEST) is better
-    assert not store.checkpoint(first.id).is_current, "the old best is kept, but no longer current"
+    assert not store.checkpoint(first.id).is_current, (
+        "the old best is kept, but no longer current"
+    )
 
 
 def test_force_promotes_a_worse_best(tmp_path, env):
     store, files = env
-    publish(store, files, a_checkpoint(tmp_path, "a.pt", 10, 100, 0.50, "best"), kind=BEST)
-    worse = publish(store, files, a_checkpoint(tmp_path, "b.pt", 20, 200, 0.60, "best"), kind=BEST, force=True)
+    publish(
+        store, files, a_checkpoint(tmp_path, "a.pt", 10, 100, 0.50, "best"), kind=BEST
+    )
+    worse = publish(
+        store,
+        files,
+        a_checkpoint(tmp_path, "b.pt", 20, 200, 0.60, "best"),
+        kind=BEST,
+        force=True,
+    )
     assert store.current_checkpoint("unit", BEST) is worse
 
 
 def test_max_mode_prefers_higher(tmp_path, env):
     store, files = env
     rule = PromotionRule("val_loss", "max")
-    publish(store, files, a_checkpoint(tmp_path, "a.pt", 10, 100, 0.50, "best"), kind=BEST, rule=rule)
-    higher = publish(store, files, a_checkpoint(tmp_path, "b.pt", 20, 200, 0.60, "best"), kind=BEST, rule=rule)
+    publish(
+        store,
+        files,
+        a_checkpoint(tmp_path, "a.pt", 10, 100, 0.50, "best"),
+        kind=BEST,
+        rule=rule,
+    )
+    higher = publish(
+        store,
+        files,
+        a_checkpoint(tmp_path, "b.pt", 20, 200, 0.60, "best"),
+        kind=BEST,
+        rule=rule,
+    )
     assert store.current_checkpoint("unit", BEST) is higher
     assert higher.promotion_mode == "max"
 
 
 def test_promote_best_relabels_a_live_file(tmp_path, env):
     store, files = env
-    record, message = promote_best(store, files, a_checkpoint(tmp_path, val_loss=0.3), "unit")
+    record, message = promote_best(
+        store, files, a_checkpoint(tmp_path, val_loss=0.3), "unit"
+    )
     assert record is not None and record.kind is BEST and "promoted" in message
-    assert load_checkpoint(tmp_path / "ckpt.pt")["checkpoint_kind"] == "live", "the source file is untouched"
+    assert load_checkpoint(tmp_path / "ckpt.pt")["checkpoint_kind"] == "live", (
+        "the source file is untouched"
+    )
 
-    worse, message = promote_best(store, files, a_checkpoint(tmp_path, "w.pt", 9, 90, 0.9), "unit")
+    worse, message = promote_best(
+        store, files, a_checkpoint(tmp_path, "w.pt", 9, 90, 0.9), "unit"
+    )
     assert worse is None and "does not beat" in message
 
 
 def test_promote_existing_history_row_to_best(tmp_path, env):
     store, files = env
-    snap = publish(store, files, a_checkpoint(tmp_path, epoch=20, step=200, val_loss=0.2, kind="history"), kind=HISTORY)
+    snap = publish(
+        store,
+        files,
+        a_checkpoint(tmp_path, epoch=20, step=200, val_loss=0.2, kind="history"),
+        kind=HISTORY,
+    )
     record, _ = promote_existing_best(store, files, snap.id)
     assert record.is_current and record.kind is BEST
     assert record.parent_checkpoint_id == snap.id
@@ -330,8 +436,12 @@ def test_promote_existing_history_row_to_best(tmp_path, env):
 
 def test_rolling_back_to_an_older_best_needs_force(tmp_path, env):
     store, files = env
-    old = publish(store, files, a_checkpoint(tmp_path, "a.pt", 10, 100, 0.50, "best"), kind=BEST)
-    publish(store, files, a_checkpoint(tmp_path, "b.pt", 20, 200, 0.40, "best"), kind=BEST)
+    old = publish(
+        store, files, a_checkpoint(tmp_path, "a.pt", 10, 100, 0.50, "best"), kind=BEST
+    )
+    publish(
+        store, files, a_checkpoint(tmp_path, "b.pt", 20, 200, 0.40, "best"), kind=BEST
+    )
 
     record, message = promote_existing_best(store, files, old.id)
     assert record is None and "--force" in message
@@ -342,9 +452,17 @@ def test_rolling_back_to_an_older_best_needs_force(tmp_path, env):
 
 def test_a_stale_comparison_cannot_promote(tmp_path, env):
     store, files = env
-    publish(store, files, a_checkpoint(tmp_path, "a.pt", 10, 100, 0.5, "best"), kind=BEST)
-    candidate = Checkpoint(kind=BEST, run_name="unit", object_path="unit/best/x.pt", sha256="a" * 64,
-                           promotion_metric="val_loss", promotion_mode="min")
+    publish(
+        store, files, a_checkpoint(tmp_path, "a.pt", 10, 100, 0.5, "best"), kind=BEST
+    )
+    candidate = Checkpoint(
+        kind=BEST,
+        run_name="unit",
+        object_path="unit/best/x.pt",
+        sha256="a" * 64,
+        promotion_metric="val_loss",
+        promotion_mode="min",
+    )
     with pytest.raises(StaleCheckpointError, match="it changed"):
         store.register_checkpoint(candidate, make_current=True, replaces=None)
 
@@ -352,14 +470,21 @@ def test_a_stale_comparison_cannot_promote(tmp_path, env):
 def test_a_best_must_record_its_metric():
     with pytest.raises(StoreError, match="metric"):
         InMemoryStore().register_checkpoint(
-            Checkpoint(kind=BEST, run_name="u", object_path="u/best/x.pt", sha256="a" * 64)
+            Checkpoint(
+                kind=BEST, run_name="u", object_path="u/best/x.pt", sha256="a" * 64
+            )
         )
 
 
 def test_history_accumulates_and_is_never_current(tmp_path, env):
     store, files = env
     for epoch in (10, 20, 30):
-        publish(store, files, a_checkpoint(tmp_path, f"h{epoch}.pt", epoch, epoch * 10, kind="history"), kind=HISTORY)
+        publish(
+            store,
+            files,
+            a_checkpoint(tmp_path, f"h{epoch}.pt", epoch, epoch * 10, kind="history"),
+            kind=HISTORY,
+        )
     history = store.checkpoints(HISTORY, run_name="unit")
     assert [h.epoch for h in history] == [10, 20, 30]
     assert not any(h.is_current for h in history)
@@ -371,12 +496,16 @@ def test_base_is_immutable(tmp_path, env):
     store, files = env
     publish(store, files, a_checkpoint(tmp_path, "a.pt", 0, 0, kind="base"), kind=BASE)
     with pytest.raises(StoreError, match="base is immutable"):
-        publish(store, files, a_checkpoint(tmp_path, "b.pt", 0, 1, kind="base"), kind=BASE)
+        publish(
+            store, files, a_checkpoint(tmp_path, "b.pt", 0, 1, kind="base"), kind=BASE
+        )
 
 
 def test_export_is_derived_from_best_without_training_state(tmp_path, env):
     store, files = env
-    best = publish(store, files, a_checkpoint(tmp_path, val_loss=0.2, kind="best"), kind=BEST)
+    best = publish(
+        store, files, a_checkpoint(tmp_path, val_loss=0.2, kind="best"), kind=BEST
+    )
 
     record = export_checkpoint(store, files, "unit", local_copy=tmp_path / "export.pt")
 
@@ -387,17 +516,34 @@ def test_export_is_derived_from_best_without_training_state(tmp_path, env):
     assert payload["optimizer_state_dict"] is None and payload["rng_state"] is None
 
 
-def _row(store, path, sha, kind=BEST, run="dup", created="2026-09-22T18:53:00Z", current=False):
-    record = Checkpoint(kind=kind, run_name=run, object_path=path, sha256=sha, size_bytes=100,
-                        created_at=created, promotion_metric="val_loss", promotion_mode="min")
-    return store.register_checkpoint(record, make_current=current,
-                                     replaces=None if not current else None)
+def _row(
+    store,
+    path,
+    sha,
+    kind=BEST,
+    run="dup",
+    created="2026-09-22T18:53:00Z",
+    current=False,
+):
+    record = Checkpoint(
+        kind=kind,
+        run_name=run,
+        object_path=path,
+        sha256=sha,
+        size_bytes=100,
+        created_at=created,
+        promotion_metric="val_loss",
+        promotion_mode="min",
+    )
+    return store.register_checkpoint(record, make_current=current, replaces=None)
 
 
 def test_duplicates_are_reported_not_deleted(env):
     store, files = env
     sha = "1c" * 32
-    first = _row(store, "best/cap50/a.pt", sha, created="2026-09-22T18:52:57Z", current=True)
+    first = _row(
+        store, "best/cap50/a.pt", sha, created="2026-09-22T18:52:57Z", current=True
+    )
     second = _row(store, "best/cap50/b.pt", sha, created="2026-09-22T18:55:27Z")
     files.objects.update({"best/cap50/a.pt": b"x" * 100, "best/cap50/b.pt": b"x" * 100})
 
@@ -436,8 +582,15 @@ def test_a_current_checkpoint_needs_an_explicit_delete(tmp_path, env):
 def test_prune_history_keeps_the_newest_and_nothing_else_is_touched(tmp_path, env):
     store, files = env
     for epoch in (10, 20, 30, 40):
-        publish(store, files, a_checkpoint(tmp_path, f"h{epoch}.pt", epoch, epoch, kind="history"), kind=HISTORY)
-    best = publish(store, files, a_checkpoint(tmp_path, "b.pt", 20, 20, 0.1, "best"), kind=BEST)
+        publish(
+            store,
+            files,
+            a_checkpoint(tmp_path, f"h{epoch}.pt", epoch, epoch, kind="history"),
+            kind=HISTORY,
+        )
+    best = publish(
+        store, files, a_checkpoint(tmp_path, "b.pt", 20, 20, 0.1, "best"), kind=BEST
+    )
 
     planned = prune_history(store, files, "unit", keep_last=2)
     assert [r.epoch for r in planned] == [10, 20]
@@ -468,13 +621,24 @@ def test_snapshot_carries_checkpoints(tmp_path, env):
 
 def test_the_card_answers_the_everyday_questions(tmp_path, env):
     store, files = env
-    record = publish(store, files, a_checkpoint(tmp_path, epoch=50, step=123456, val_loss=0.40767, kind="best"), kind=BEST)
+    record = publish(
+        store,
+        files,
+        a_checkpoint(tmp_path, epoch=50, step=123456, val_loss=0.40767, kind="best"),
+        kind=BEST,
+    )
     text = card(record)
-    for expected in ("Role:            BEST (current)", "Epoch:           50",
-                     "Global step:     123,456", "Validation loss: 0.40767",
-                     "Promoted by:     val_loss (lower is better)", f"SHA-256:         {record.sha256}",
-                     "Format:          2", f"Storage path:    ored-checkpoints/{record.object_path}",
-                     "Verified:        YES"):
+    for expected in (
+        "Role:            BEST (current)",
+        "Epoch:           50",
+        "Global step:     123,456",
+        "Validation loss: 0.40767",
+        "Promoted by:     val_loss (lower is better)",
+        f"SHA-256:         {record.sha256}",
+        "Format:          2",
+        f"Storage path:    ored-checkpoints/{record.object_path}",
+        "Verified:        YES",
+    ):
         assert expected in text, expected
 
 
@@ -497,4 +661,8 @@ def test_cli_verify_reads_a_local_file(tmp_path, capsys):
     path = a_checkpoint(tmp_path)
     assert cli_main(["verify", str(path)]) == 0
     out = capsys.readouterr().out
-    assert "Role:            LIVE" in out and digest(path) in out and "Loads:           YES" in out
+    assert (
+        "Role:            LIVE" in out
+        and digest(path) in out
+        and "Loads:           YES" in out
+    )

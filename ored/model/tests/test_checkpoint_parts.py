@@ -4,9 +4,13 @@ import json
 import urllib.parse
 
 import pytest
-
 from ored.learning import StoreError
-from ored.learning.checkpoints import CheckpointStore, ObjectExistsError, digest, upload_verified
+from ored.learning.checkpoints import (
+    CheckpointStore,
+    ObjectExistsError,
+    digest,
+    upload_verified,
+)
 
 LIMIT = 10
 
@@ -15,13 +19,17 @@ class HttpBucket(CheckpointStore):
     """Speaks the Storage REST API through _send and rejects objects over LIMIT bytes."""
 
     def __init__(self, max_object_bytes=LIMIT):
-        super().__init__("https://example.supabase.co", "key", "ored-checkpoints",
-                         max_object_bytes=max_object_bytes)
+        super().__init__(
+            "https://example.supabase.co",
+            "key",
+            "ored-checkpoints",
+            max_object_bytes=max_object_bytes,
+        )
         self.objects = {}
 
     def _path(self, url):
         prefix = f"{self.base}/object/ored-checkpoints/"
-        return urllib.parse.unquote(url[len(prefix):])
+        return urllib.parse.unquote(url[len(prefix) :])
 
     def _send(self, method, url, data=None, headers=None):
         if url.startswith(f"{self.base}/object/list/"):
@@ -32,11 +40,13 @@ class HttpBucket(CheckpointStore):
             for path, blob in sorted(self.objects.items()):
                 if not path.startswith(start):
                     continue
-                rest = path[len(start):]
+                rest = path[len(start) :]
                 if "/" in rest:
                     dirs.add(rest.split("/")[0])
                 elif rest.startswith(body["search"]):
-                    items.append({"name": rest, "id": "x", "metadata": {"size": len(blob)}})
+                    items.append(
+                        {"name": rest, "id": "x", "metadata": {"size": len(blob)}}
+                    )
             items += [{"name": d, "id": None} for d in sorted(dirs)]
             return json.dumps(items).encode()
         path = self._path(url)

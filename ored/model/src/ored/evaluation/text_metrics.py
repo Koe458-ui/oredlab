@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Dict, List, Sequence, Tuple
 
 
-def build_template_patterns(grammar: Dict[str, object]) -> List[re.Pattern]:
+def build_template_patterns(grammar: dict[str, Sequence[str]]) -> list[re.Pattern]:
     slots = {
         "adj": grammar["adjectives"],
         "noun": grammar["nouns"],
@@ -14,7 +14,7 @@ def build_template_patterns(grammar: Dict[str, object]) -> List[re.Pattern]:
         "verb_p": grammar["verbs_plural"],
     }
 
-    patterns: List[re.Pattern] = []
+    patterns: list[re.Pattern] = []
     for template in grammar["templates"]:
         pattern = re.escape(template)
         for slot, words in slots.items():
@@ -36,13 +36,12 @@ def format_expected(total: int, reverse_answer: bool) -> str:
 
 @dataclass
 class TextQuality:
-
     total_lines: int = 0
     grammatical_lines: int = 0
     arithmetic_lines: int = 0
     arithmetic_correct: int = 0
     malformed_lines: int = 0
-    examples_bad: List[str] = field(default_factory=list)
+    examples_bad: list[str] = field(default_factory=list)
 
     @property
     def valid_lines(self) -> int:
@@ -53,8 +52,12 @@ class TextQuality:
         return self.valid_lines / self.total_lines if self.total_lines else 0.0
 
 
-def score_text(text: str, grammar: Dict[str, object], keep_examples: int = 5,
-               reverse_answer: bool = False) -> TextQuality:
+def score_text(
+    text: str,
+    grammar: dict[str, Sequence[str]],
+    keep_examples: int = 5,
+    reverse_answer: bool = False,
+) -> TextQuality:
     patterns = build_template_patterns(grammar)
     lines = text.split("\n")
     if len(lines) > 2:
@@ -92,11 +95,10 @@ def score_text(text: str, grammar: Dict[str, object], keep_examples: int = 5,
 
 @dataclass
 class ArithmeticResult:
-
     total: int = 0
     correct: int = 0
     parse_failures: int = 0
-    mistakes: List[str] = field(default_factory=list)
+    mistakes: list[str] = field(default_factory=list)
 
     @property
     def accuracy(self) -> float:
@@ -104,7 +106,7 @@ class ArithmeticResult:
 
 
 def score_arithmetic(
-    completions: Sequence[Tuple[int, int, str]],
+    completions: Sequence[tuple[int, int, str]],
     keep_mistakes: int = 8,
     reverse_answer: bool = False,
 ) -> ArithmeticResult:
@@ -118,7 +120,9 @@ def score_arithmetic(
         if not cleaned.isdigit():
             result.parse_failures += 1
             if len(result.mistakes) < keep_mistakes:
-                result.mistakes.append(f"{a} + {b} = {cleaned!r}  (not a number; expected {shown})")
+                result.mistakes.append(
+                    f"{a} + {b} = {cleaned!r}  (not a number; expected {shown})"
+                )
             continue
 
         if int(cleaned[::-1] if reverse_answer else cleaned) == expected:

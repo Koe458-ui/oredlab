@@ -6,7 +6,7 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from ored.data.tokenizer import Tokenizer
 
@@ -18,12 +18,12 @@ class TokenizerArtifactError(ValueError):
     pass
 
 
-def tokenizer_sha256(tokenizer: Tokenizer | Dict[str, Any]) -> str:
+def tokenizer_sha256(tokenizer: Tokenizer | dict[str, Any]) -> str:
     data = tokenizer.to_dict() if isinstance(tokenizer, Tokenizer) else tokenizer
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
 
-def identity(tokenizer: Tokenizer, name: str = "", version: str = "") -> Dict[str, Any]:
+def identity(tokenizer: Tokenizer, name: str = "", version: str = "") -> dict[str, Any]:
     data = tokenizer.to_dict()
     return {
         "format": ARTIFACT_FORMAT,
@@ -37,11 +37,18 @@ def identity(tokenizer: Tokenizer, name: str = "", version: str = "") -> Dict[st
     }
 
 
-def save_artifact(tokenizer: Tokenizer, path: str | Path, name: str, version: str,
-                  training: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def save_artifact(
+    tokenizer: Tokenizer,
+    path: str | Path,
+    name: str,
+    version: str,
+    training: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     for label, value in (("name", name), ("version", version)):
         if not NAME.match(value or ""):
-            raise TokenizerArtifactError(f"tokenizer {label} {value!r} must be letters, digits, . _ -")
+            raise TokenizerArtifactError(
+                f"tokenizer {label} {value!r} must be letters, digits, . _ -"
+            )
     path = Path(path)
     data = tokenizer.to_dict()
     artifact = {
@@ -61,20 +68,32 @@ def save_artifact(tokenizer: Tokenizer, path: str | Path, name: str, version: st
     return identity(tokenizer, name, version)
 
 
-def load_artifact(path: str | Path, expected_sha256: str = "") -> Tuple[Tokenizer, Dict[str, Any]]:
+def load_artifact(
+    path: str | Path, expected_sha256: str = ""
+) -> tuple[Tokenizer, dict[str, Any]]:
     path = Path(path)
     try:
         artifact = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        raise TokenizerArtifactError(f"{path} is not a readable tokenizer artifact: {exc}") from exc
+        raise TokenizerArtifactError(
+            f"{path} is not a readable tokenizer artifact: {exc}"
+        ) from exc
     if artifact.get("format") != ARTIFACT_FORMAT:
-        raise TokenizerArtifactError(f"{path} is not an {ARTIFACT_FORMAT} file "
-                                     f"(format {artifact.get('format')!r})")
+        raise TokenizerArtifactError(
+            f"{path} is not an {ARTIFACT_FORMAT} file "
+            f"(format {artifact.get('format')!r})"
+        )
     actual = tokenizer_sha256(artifact["tokenizer"])
     if actual != artifact.get("sha256"):
-        raise TokenizerArtifactError(f"{path} is damaged: its tokenizer hashes to {actual[:16]}, "
-                                     f"the file records {str(artifact.get('sha256'))[:16]}")
+        raise TokenizerArtifactError(
+            f"{path} is damaged: its tokenizer hashes to {actual[:16]}, "
+            f"the file records {str(artifact.get('sha256'))[:16]}"
+        )
     if expected_sha256 and actual != expected_sha256:
-        raise TokenizerArtifactError(f"{path} is tokenizer {actual[:16]}, expected {expected_sha256[:16]}")
+        raise TokenizerArtifactError(
+            f"{path} is tokenizer {actual[:16]}, expected {expected_sha256[:16]}"
+        )
     tokenizer = Tokenizer.from_dict(artifact["tokenizer"])
-    return tokenizer, identity(tokenizer, artifact.get("name", ""), artifact.get("version", ""))
+    return tokenizer, identity(
+        tokenizer, artifact.get("name", ""), artifact.get("version", "")
+    )

@@ -1,7 +1,13 @@
 from __future__ import annotations
 
-from ored.data.corpus import (format_answer, generate_corpus, load_arithmetic_pairs,
-                              make_arithmetic, read_answer, read_corpus)
+from ored.data.corpus import (
+    format_answer,
+    generate_corpus,
+    load_arithmetic_pairs,
+    make_arithmetic,
+    read_answer,
+    read_corpus,
+)
 from ored.evaluation.text_metrics import score_arithmetic, score_text
 
 
@@ -42,11 +48,14 @@ def test_score_arithmetic_counts_non_numbers_as_parse_failures():
 
 def test_score_text_grades_reversed_sums(tiny_corpus):
     grammar = {
-        "names": ["anna"], "nouns": ["cat"], "adjectives": ["red"],
-        "verbs_singular": ["sees"], "verbs_plural": ["see"],
+        "names": ["anna"],
+        "nouns": ["cat"],
+        "adjectives": ["red"],
+        "verbs_singular": ["sees"],
+        "verbs_plural": ["see"],
         "templates": ["the {adj} {noun} {verb_s} {name} ."],
     }
-    text = "\n".join(["", "13 + 8 = 12", "5 + 4 = 9", "13 + 8 = 21", ""])
+    text = "\n13 + 8 = 12\n5 + 4 = 9\n13 + 8 = 21\n"
 
     quality = score_text(text, grammar, reverse_answer=True)
     assert quality.arithmetic_lines == 3

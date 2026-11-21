@@ -3,17 +3,22 @@ from __future__ import annotations
 import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import ClassVar
 from xml.sax.saxutils import escape
 
 import pytest
-
 from ored.learning import StoreError
-from ored.learning.checkpoints import CheckpointStore, ObjectExistsError, digest, upload_verified
+from ored.learning.checkpoints import (
+    CheckpointStore,
+    ObjectExistsError,
+    digest,
+    upload_verified,
+)
 from ored.learning.r2 import R2Store, copy_bucket
 
 
 class FakeS3(BaseHTTPRequestHandler):
-    objects: dict = {}
+    objects: ClassVar[dict] = {}
     page = 2
 
     def log_message(self, *args):
@@ -28,15 +33,22 @@ class FakeS3(BaseHTTPRequestHandler):
         self.send_response(status)
         for k, v in (headers or {}).items():
             self.send_header(k, v)
-        self.send_header("content-length", str(len(body)) if self.command != "HEAD" else
-                         (headers or {}).get("x-size", "0"))
+        self.send_header(
+            "content-length",
+            str(len(body))
+            if self.command != "HEAD"
+            else (headers or {}).get("x-size", "0"),
+        )
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)
 
     def _authorized(self):
         auth = self.headers.get("authorization", "")
-        if not auth.startswith("AWS4-HMAC-SHA256 Credential=key-id/") or "x-amz-date" not in self.headers:
+        if (
+            not auth.startswith("AWS4-HMAC-SHA256 Credential=key-id/")
+            or "x-amz-date" not in self.headers
+        ):
             self._reply(403, b"<Error>SignatureDoesNotMatch</Error>")
             return False
         return True
@@ -62,14 +74,18 @@ class FakeS3(BaseHTTPRequestHandler):
         query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
         keys = sorted(k for k in self.objects if k.startswith(query.get("prefix", "")))
         start = int(query.get("continuation-token", "0"))
-        chunk = keys[start:start + self.page]
+        chunk = keys[start : start + self.page]
         more = start + self.page < len(keys)
         body = '<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
-        body += "".join(f"<Contents><Key>{escape(k)}</Key><Size>{len(self.objects[k])}</Size></Contents>"
-                        for k in chunk)
+        body += "".join(
+            f"<Contents><Key>{escape(k)}</Key><Size>{len(self.objects[k])}</Size></Contents>"
+            for k in chunk
+        )
         body += f"<IsTruncated>{'true' if more else 'false'}</IsTruncated>"
         if more:
-            body += f"<NextContinuationToken>{start + self.page}</NextContinuationToken>"
+            body += (
+                f"<NextContinuationToken>{start + self.page}</NextContinuationToken>"
+            )
         self._reply(200, (body + "</ListBucketResult>").encode())
 
     def do_HEAD(self):
@@ -94,7 +110,9 @@ def r2():
     server = ThreadingHTTPServer(("127.0.0.1", 0), FakeS3)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    yield R2Store("acct", "key-id", "secret", endpoint=f"http://127.0.0.1:{server.server_port}")
+    yield R2Store(
+        "acct", "key-id", "secret", endpoint=f"http://127.0.0.1:{server.server_port}"
+    )
     server.shutdown()
 
 
@@ -109,7 +127,9 @@ def test_round_trip_keeps_the_same_name(r2, tmp_path):
     r2.upload(path, "ored_v202/best/epoch_0025_step_00002125.pt")
     assert list(FakeS3.objects) == ["ored_v202/best/epoch_0025_step_00002125.pt"]
     assert r2.stat("ored_v202/best/epoch_0025_step_00002125.pt") == 3000
-    out = r2.download("ored_v202/best/epoch_0025_step_00002125.pt", tmp_path / "o" / "x.pt")
+    out = r2.download(
+        "ored_v202/best/epoch_0025_step_00002125.pt", tmp_path / "o" / "x.pt"
+    )
     assert out.read_bytes() == path.read_bytes()
 
 
@@ -165,7 +185,9 @@ def test_copy_bucket_moves_everything_and_can_rerun(r2, tmp_path):
     small, big = a_file(tmp_path, 7, "s.pt"), a_file(tmp_path, 25, "b.pt", seed=4)
     source.upload(small, "run/export/s.pt")
     source.upload(big, "run/best/b.pt")
-    report = copy_bucket(source, r2, expected={"run/best/b.pt": digest(big)}, workdir=tmp_path)
+    report = copy_bucket(
+        source, r2, expected={"run/best/b.pt": digest(big)}, workdir=tmp_path
+    )
     assert sorted(report["copied"]) == ["run/best/b.pt", "run/export/s.pt"]
     assert FakeS3.objects["run/best/b.pt"] == big.read_bytes()
     again = copy_bucket(source, r2)
@@ -177,6 +199,8 @@ def test_copy_bucket_refuses_a_bad_hash(r2, tmp_path):
 
     source = HttpBucket()
     source.upload(a_file(tmp_path, 7), "run/best/a.pt")
-    report = copy_bucket(source, r2, expected={"run/best/a.pt": "0" * 64}, workdir=tmp_path)
+    report = copy_bucket(
+        source, r2, expected={"run/best/a.pt": "0" * 64}, workdir=tmp_path
+    )
     assert report["copied"] == [] and len(report["failed"]) == 1
     assert "run/best/a.pt" not in FakeS3.objects

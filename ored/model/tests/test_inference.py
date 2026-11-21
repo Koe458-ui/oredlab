@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 import torch
-
 from ored.inference.predictor import (
     BasePredictor,
     LanguageModelPredictor,
@@ -47,7 +46,10 @@ def test_language_model_predicts_from_text(trained_lm_checkpoint):
 
 def test_language_model_text_predictions_are_deterministic(trained_lm_checkpoint):
     predictor = load_predictor(trained_lm_checkpoint, device="cpu")
-    assert predictor.predict("2 + 3 = ").completion == predictor.predict("2 + 3 = ").completion
+    assert (
+        predictor.predict("2 + 3 = ").completion
+        == predictor.predict("2 + 3 = ").completion
+    )
 
 
 def test_language_model_generates_text(trained_lm_checkpoint):
@@ -58,7 +60,9 @@ def test_language_model_generates_text(trained_lm_checkpoint):
     assert len(text) > len("the ")
 
 
-def test_language_model_predict_sum_scores_against_the_right_answer(trained_lm_checkpoint):
+def test_language_model_predict_sum_scores_against_the_right_answer(
+    trained_lm_checkpoint,
+):
     predictor = load_predictor(trained_lm_checkpoint, device="cpu")
     prediction = predictor.predict_sum(3, 4)
 
@@ -105,12 +109,17 @@ def test_language_model_cli_completes_text(trained_lm_checkpoint):
     ored_logger = logging.getLogger("ored")
     ored_logger.addHandler(handler)
     try:
-        exit_code = predictor_main([
-            "--checkpoint", str(trained_lm_checkpoint),
-            "--device", "cpu",
-            "--text", "5 + 6 = ",
-            "--quiet",
-        ])
+        exit_code = predictor_main(
+            [
+                "--checkpoint",
+                str(trained_lm_checkpoint),
+                "--device",
+                "cpu",
+                "--text",
+                "5 + 6 = ",
+                "--quiet",
+            ]
+        )
     finally:
         ored_logger.removeHandler(handler)
 
@@ -129,7 +138,9 @@ def _payload(path):
     return torch.load(path, map_location="cpu", weights_only=True)
 
 
-def test_checkpoint_task_is_read_from_the_payload_not_just_the_label(trained_lm_checkpoint):
+def test_checkpoint_task_is_read_from_the_payload_not_just_the_label(
+    trained_lm_checkpoint,
+):
     from ored.config import config_from_dict
 
     payload = _payload(trained_lm_checkpoint)
@@ -142,7 +153,9 @@ def test_checkpoint_task_is_read_from_the_payload_not_just_the_label(trained_lm_
     assert resolve_task(payload, stale, trained_lm_checkpoint) == "language_model"
 
 
-def test_stale_task_label_still_loads_the_char_transformer(trained_lm_checkpoint, tmp_path):
+def test_stale_task_label_still_loads_the_char_transformer(
+    trained_lm_checkpoint, tmp_path
+):
     payload = _payload(trained_lm_checkpoint)
     payload["config"]["task"] = "bit_addition"
     mislabelled = tmp_path / "mislabelled.pt"
@@ -176,7 +189,9 @@ def test_state_dict_loading_stays_strict(trained_lm_checkpoint, tmp_path):
         load_predictor(incomplete, device="cpu")
 
 
-def test_char_transformer_checkpoint_runs_through_the_cli(trained_lm_checkpoint, tmp_path):
+def test_char_transformer_checkpoint_runs_through_the_cli(
+    trained_lm_checkpoint, tmp_path
+):
     import io
     import logging
     import shutil
@@ -200,4 +215,3 @@ def test_char_transformer_checkpoint_runs_through_the_cli(trained_lm_checkpoint,
     assert "generated text:" in output
     assert "3 + 4 = " in output
     assert "bits " not in output
-

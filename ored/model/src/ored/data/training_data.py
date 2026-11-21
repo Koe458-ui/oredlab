@@ -3,8 +3,9 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any
 
 FINGERPRINT_VERSION = "v1"
 TEXT_FORMAT_VERSION = 1
@@ -14,7 +15,7 @@ MAX_INPUT_CHARS = 10000
 MAX_OUTPUT_CHARS = 10000
 MAX_METADATA_KEYS = 50
 
-TYPES: Dict[str, Tuple[str, str]] = {
+TYPES: dict[str, tuple[str, str]] = {
     "qna": ("Question", "Answer"),
     "fact": ("Question", "Answer"),
     "definition": ("Term", "Definition"),
@@ -31,96 +32,400 @@ TYPES: Dict[str, Tuple[str, str]] = {
     "classification": ("Text", "Label"),
 }
 
-TAXONOMY: Dict[str, Dict[str, List[str]]] = {
-    "language_foundation": {s: [] for s in (
-        "alphabet", "uppercase_letters", "lowercase_letters", "digits", "punctuation", "symbols",
-        "vocabulary", "common_words", "word_meanings", "synonyms", "antonyms", "homonyms",
-        "homophones", "abbreviations", "common_expressions")},
-    "grammar": {s: [] for s in (
-        "nouns", "pronouns", "verbs", "adjectives", "adverbs", "prepositions", "conjunctions",
-        "articles", "singular_plural", "tenses", "active_passive_voice", "direct_indirect_speech",
-        "sentence_structure", "clauses", "conditionals", "grammar_correction", "english_grammar")},
-    "sentences": {s: [] for s in (
-        "simple", "compound", "complex", "questions", "answers", "commands", "requests",
-        "statements", "descriptions", "explanations", "sentence_completion")},
-    "general_knowledge": {s: [] for s in (
-        "everyday_facts", "people", "places", "countries", "cities", "continents", "oceans",
-        "landmarks", "history", "geography", "culture", "society", "civics", "economics",
-        "commerce", "philosophy", "art_and_artists", "outdoor_sports", "online_games")},
-    "qna": {s: [] for s in (
-        "factual", "definition", "explanation", "comparison", "how_to", "why", "what", "who",
-        "where", "when", "how")},
-    "conversation": {s: [] for s in (
-        "greetings", "introductions", "casual_conversation", "follow_up_questions",
-        "acknowledgements", "thanks", "apologies", "clarification", "uncertainty", "corrections",
-        "multi_turn", "context_continuation")},
-    "mathematics": {s: [] for s in (
-        "numbers", "counting", "addition", "subtraction", "multiplication", "division", "fractions",
-        "decimals", "percentages", "ratios", "proportions", "averages", "powers", "roots",
-        "algebra", "equations", "inequalities", "sequences", "sets", "geometry", "trigonometry",
-        "coordinate_geometry", "probability", "statistics", "calculus", "unit_conversion",
-        "mathematical_reasoning", "arithmetic")},
+TAXONOMY: dict[str, dict[str, list[str]]] = {
+    "language_foundation": {
+        s: []
+        for s in (
+            "alphabet",
+            "uppercase_letters",
+            "lowercase_letters",
+            "digits",
+            "punctuation",
+            "symbols",
+            "vocabulary",
+            "common_words",
+            "word_meanings",
+            "synonyms",
+            "antonyms",
+            "homonyms",
+            "homophones",
+            "abbreviations",
+            "common_expressions",
+        )
+    },
+    "grammar": {
+        s: []
+        for s in (
+            "nouns",
+            "pronouns",
+            "verbs",
+            "adjectives",
+            "adverbs",
+            "prepositions",
+            "conjunctions",
+            "articles",
+            "singular_plural",
+            "tenses",
+            "active_passive_voice",
+            "direct_indirect_speech",
+            "sentence_structure",
+            "clauses",
+            "conditionals",
+            "grammar_correction",
+            "english_grammar",
+        )
+    },
+    "sentences": {
+        s: []
+        for s in (
+            "simple",
+            "compound",
+            "complex",
+            "questions",
+            "answers",
+            "commands",
+            "requests",
+            "statements",
+            "descriptions",
+            "explanations",
+            "sentence_completion",
+        )
+    },
+    "general_knowledge": {
+        s: []
+        for s in (
+            "everyday_facts",
+            "people",
+            "places",
+            "countries",
+            "cities",
+            "continents",
+            "oceans",
+            "landmarks",
+            "history",
+            "geography",
+            "culture",
+            "society",
+            "civics",
+            "economics",
+            "commerce",
+            "philosophy",
+            "art_and_artists",
+            "outdoor_sports",
+            "online_games",
+        )
+    },
+    "qna": {
+        s: []
+        for s in (
+            "factual",
+            "definition",
+            "explanation",
+            "comparison",
+            "how_to",
+            "why",
+            "what",
+            "who",
+            "where",
+            "when",
+            "how",
+        )
+    },
+    "conversation": {
+        s: []
+        for s in (
+            "greetings",
+            "introductions",
+            "casual_conversation",
+            "follow_up_questions",
+            "acknowledgements",
+            "thanks",
+            "apologies",
+            "clarification",
+            "uncertainty",
+            "corrections",
+            "multi_turn",
+            "context_continuation",
+        )
+    },
+    "mathematics": {
+        s: []
+        for s in (
+            "numbers",
+            "counting",
+            "addition",
+            "subtraction",
+            "multiplication",
+            "division",
+            "fractions",
+            "decimals",
+            "percentages",
+            "ratios",
+            "proportions",
+            "averages",
+            "powers",
+            "roots",
+            "algebra",
+            "equations",
+            "inequalities",
+            "sequences",
+            "sets",
+            "geometry",
+            "trigonometry",
+            "coordinate_geometry",
+            "probability",
+            "statistics",
+            "calculus",
+            "unit_conversion",
+            "mathematical_reasoning",
+            "arithmetic",
+        )
+    },
     "science": {
         "physics": [
-            "units", "measurements", "vectors", "kinematics", "mechanics", "work", "energy", "power",
-            "momentum", "gravitation", "rotational_motion", "matter", "fluids", "thermodynamics",
-            "kinetic_theory", "waves", "sound", "optics", "electricity", "magnetism",
-            "electromagnetism", "circuits", "semiconductors", "electronics", "quantum_physics",
-            "atomic_physics", "nuclear_physics", "relativity", "astrophysics"],
+            "units",
+            "measurements",
+            "vectors",
+            "kinematics",
+            "mechanics",
+            "work",
+            "energy",
+            "power",
+            "momentum",
+            "gravitation",
+            "rotational_motion",
+            "matter",
+            "fluids",
+            "thermodynamics",
+            "kinetic_theory",
+            "waves",
+            "sound",
+            "optics",
+            "electricity",
+            "magnetism",
+            "electromagnetism",
+            "circuits",
+            "semiconductors",
+            "electronics",
+            "quantum_physics",
+            "atomic_physics",
+            "nuclear_physics",
+            "relativity",
+            "astrophysics",
+        ],
         "chemistry": [
-            "atoms", "molecules", "elements", "periodic_table", "chemical_bonding",
-            "chemical_reactions", "stoichiometry", "acids_bases", "salts", "solutions", "gases",
-            "thermochemistry", "equilibrium", "kinetics", "electrochemistry", "organic_chemistry",
-            "inorganic_chemistry", "physical_chemistry", "biochemistry"],
+            "atoms",
+            "molecules",
+            "elements",
+            "periodic_table",
+            "chemical_bonding",
+            "chemical_reactions",
+            "stoichiometry",
+            "acids_bases",
+            "salts",
+            "solutions",
+            "gases",
+            "thermochemistry",
+            "equilibrium",
+            "kinetics",
+            "electrochemistry",
+            "organic_chemistry",
+            "inorganic_chemistry",
+            "physical_chemistry",
+            "biochemistry",
+        ],
         "biology": [
-            "cells", "genetics", "dna_rna", "evolution", "anatomy", "physiology", "microbiology",
-            "botany", "zoology", "ecology", "ecosystems", "reproduction", "metabolism",
-            "biotechnology"],
+            "cells",
+            "genetics",
+            "dna_rna",
+            "evolution",
+            "anatomy",
+            "physiology",
+            "microbiology",
+            "botany",
+            "zoology",
+            "ecology",
+            "ecosystems",
+            "reproduction",
+            "metabolism",
+            "biotechnology",
+        ],
         "astronomy": [],
     },
-    "computer_science": {s: [] for s in (
-        "computer_fundamentals", "hardware", "software", "operating_systems", "programming",
-        "algorithms", "data_structures", "databases", "networking", "web_development",
-        "cybersecurity_concepts", "artificial_intelligence", "machine_learning", "neural_networks",
-        "computer_architecture", "programming_languages")},
-    "engineering": {s: [] for s in (
-        "electrical_engineering", "electronics", "digital_electronics", "analog_electronics", "vlsi",
-        "microelectronics", "communication_systems", "telecommunications", "mechanical_engineering",
-        "civil_engineering", "materials_science", "robotics", "control_systems")},
-    "reasoning": {s: [] for s in (
-        "logical_reasoning", "pattern_recognition", "sequence_reasoning", "classification",
-        "analogy", "deduction", "induction", "cause_effect", "comparison", "multi_step_reasoning",
-        "mathematical_reasoning", "verbal_reasoning", "reasoning_explanations")},
-    "instructions": {s: [] for s in (
-        "simple_instructions", "multi_step_instructions", "formatting", "task_completion",
-        "summarization", "rewriting", "classification", "extraction", "transformation",
-        "instruction_with_context")},
-    "reading": {s: [] for s in (
-        "passages", "fact_extraction", "question_answering", "summarization", "main_idea",
-        "details", "inference", "context_understanding", "paragraph_ordering")},
-    "writing": {s: [] for s in (
-        "paragraphs", "essays", "explanations", "descriptions", "stories", "dialogues", "emails",
-        "messages", "reports", "notes", "structured_writing")},
-    "language_skills": {s: [] for s in (
-        "translation", "paraphrasing", "summarization", "text_correction", "spelling_correction",
-        "grammar_correction", "classification", "keyword_extraction", "terminology", "linguistics")},
-    "data": {s: [] for s in (
-        "tables", "lists", "structured_data", "data_interpretation", "charts", "percentages",
-        "measurements", "units", "conversions")},
-    "everyday": {s: [] for s in (
-        "time", "dates", "calendars", "money", "food", "household_objects", "transportation",
-        "education", "work", "communication", "common_activities")},
-    "safety": {s: [] for s in (
-        "uncertainty", "admitting_lack_of_knowledge", "clarification", "privacy",
-        "responsible_handling")},
-    "ored": {s: [] for s in (
-        "assistant_identity", "response_format", "conversation_style", "context_handling",
-        "question_clarification", "factual_correction", "uncertainty_handling",
-        "response_examples")},
+    "computer_science": {
+        s: []
+        for s in (
+            "computer_fundamentals",
+            "hardware",
+            "software",
+            "operating_systems",
+            "programming",
+            "algorithms",
+            "data_structures",
+            "databases",
+            "networking",
+            "web_development",
+            "cybersecurity_concepts",
+            "artificial_intelligence",
+            "machine_learning",
+            "neural_networks",
+            "computer_architecture",
+            "programming_languages",
+        )
+    },
+    "engineering": {
+        s: []
+        for s in (
+            "electrical_engineering",
+            "electronics",
+            "digital_electronics",
+            "analog_electronics",
+            "vlsi",
+            "microelectronics",
+            "communication_systems",
+            "telecommunications",
+            "mechanical_engineering",
+            "civil_engineering",
+            "materials_science",
+            "robotics",
+            "control_systems",
+        )
+    },
+    "reasoning": {
+        s: []
+        for s in (
+            "logical_reasoning",
+            "pattern_recognition",
+            "sequence_reasoning",
+            "classification",
+            "analogy",
+            "deduction",
+            "induction",
+            "cause_effect",
+            "comparison",
+            "multi_step_reasoning",
+            "mathematical_reasoning",
+            "verbal_reasoning",
+            "reasoning_explanations",
+        )
+    },
+    "instructions": {
+        s: []
+        for s in (
+            "simple_instructions",
+            "multi_step_instructions",
+            "formatting",
+            "task_completion",
+            "summarization",
+            "rewriting",
+            "classification",
+            "extraction",
+            "transformation",
+            "instruction_with_context",
+        )
+    },
+    "reading": {
+        s: []
+        for s in (
+            "passages",
+            "fact_extraction",
+            "question_answering",
+            "summarization",
+            "main_idea",
+            "details",
+            "inference",
+            "context_understanding",
+            "paragraph_ordering",
+        )
+    },
+    "writing": {
+        s: []
+        for s in (
+            "paragraphs",
+            "essays",
+            "explanations",
+            "descriptions",
+            "stories",
+            "dialogues",
+            "emails",
+            "messages",
+            "reports",
+            "notes",
+            "structured_writing",
+        )
+    },
+    "language_skills": {
+        s: []
+        for s in (
+            "translation",
+            "paraphrasing",
+            "summarization",
+            "text_correction",
+            "spelling_correction",
+            "grammar_correction",
+            "classification",
+            "keyword_extraction",
+            "terminology",
+            "linguistics",
+        )
+    },
+    "data": {
+        s: []
+        for s in (
+            "tables",
+            "lists",
+            "structured_data",
+            "data_interpretation",
+            "charts",
+            "percentages",
+            "measurements",
+            "units",
+            "conversions",
+        )
+    },
+    "everyday": {
+        s: []
+        for s in (
+            "time",
+            "dates",
+            "calendars",
+            "money",
+            "food",
+            "household_objects",
+            "transportation",
+            "education",
+            "work",
+            "communication",
+            "common_activities",
+        )
+    },
+    "safety": {
+        s: []
+        for s in (
+            "uncertainty",
+            "admitting_lack_of_knowledge",
+            "clarification",
+            "privacy",
+            "responsible_handling",
+        )
+    },
+    "ored": {
+        s: []
+        for s in (
+            "assistant_identity",
+            "response_format",
+            "conversation_style",
+            "context_handling",
+            "question_clarification",
+            "factual_correction",
+            "uncertainty_handling",
+            "response_examples",
+        )
+    },
 }
 
-CATEGORIES: Tuple[str, ...] = tuple(TAXONOMY)
-DIFFICULTIES: Tuple[str, ...] = ("beginner", "intermediate", "advanced", "expert")
+CATEGORIES: tuple[str, ...] = tuple(TAXONOMY)
+DIFFICULTIES: tuple[str, ...] = ("beginner", "intermediate", "advanced", "expert")
 
 WHITESPACE = re.compile(r"[ \t\n\r\f\v]+")
 SLUG_SEPARATORS = re.compile(r"[ /-]+")
@@ -135,34 +440,41 @@ ALL_TAGS = "all"
 EDGE = " \t\n\r\f\v"
 
 
-def slug(value: Optional[str]) -> Optional[str]:
+def slug(value: str | None) -> str | None:
     if value is None:
         return None
     text = SLUG_SEPARATORS.sub("_", value.strip(EDGE).lower())
     return text or None
 
 
-def language_code(value: Optional[str]) -> str:
+def language_code(value: str | None) -> str:
     return (value or "").strip(EDGE).lower()
 
 
-def optional_text(value: Optional[str]) -> Optional[str]:
+def optional_text(value: str | None) -> str | None:
     if value is None:
         return None
     text = value.strip(EDGE)
     return text or None
 
 
-def normal_key(value: Optional[str]) -> str:
+def normal_key(value: str | None) -> str:
     return normal_text(value).lower()
 
 
-def normal_text(value: Optional[str]) -> str:
+def normal_text(value: str | None) -> str:
     return WHITESPACE.sub(" ", unicodedata.normalize("NFC", value or "")).strip(" ")
 
 
-def fingerprint_of(type: str, category: str, subject: Optional[str], topic: Optional[str],
-                   input: str, output: str, language: str) -> str:
+def fingerprint_of(
+    type: str,
+    category: str,
+    subject: str | None,
+    topic: str | None,
+    input: str,
+    output: str,
+    language: str,
+) -> str:
     parts = [
         FINGERPRINT_VERSION,
         normal_key(type),
@@ -177,8 +489,15 @@ def fingerprint_of(type: str, category: str, subject: Optional[str], topic: Opti
 
 
 def fingerprint(record: Any) -> str:
-    return fingerprint_of(record.type, record.category, record.subject, record.topic,
-                          record.input, record.output, record.language)
+    return fingerprint_of(
+        record.type,
+        record.category,
+        record.subject,
+        record.topic,
+        record.input,
+        record.output,
+        record.language,
+    )
 
 
 def normalise_fields(record: Any) -> Any:
@@ -197,10 +516,9 @@ def normalise_fields(record: Any) -> Any:
 
 @dataclass
 class RecordCheck:
-
     record_id: str
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -212,7 +530,7 @@ class RecordCheck:
         return "\n".join(lines)
 
 
-def _text_problems(name: str, value: Any, limit: int) -> List[str]:
+def _text_problems(name: str, value: Any, limit: int) -> list[str]:
     if not isinstance(value, str):
         return [f"{name} must be text, got {type(value).__name__}"]
     problems = []
@@ -221,11 +539,17 @@ def _text_problems(name: str, value: Any, limit: int) -> List[str]:
     if len(value) > limit:
         problems.append(f"{name} is {len(value)} characters, the limit is {limit}")
     if CONTROL.search(value):
-        problems.append(f"{name} contains a control character (only tab and newline are allowed)")
+        problems.append(
+            f"{name} contains a control character (only tab and newline are allowed)"
+        )
     if "�" in value:
-        problems.append(f"{name} contains U+FFFD, the sign of text that was decoded wrongly")
+        problems.append(
+            f"{name} contains U+FFFD, the sign of text that was decoded wrongly"
+        )
     if any(0xD800 <= ord(c) <= 0xDFFF for c in value):
-        problems.append(f"{name} contains an unpaired surrogate, which is not valid Unicode")
+        problems.append(
+            f"{name} contains an unpaired surrogate, which is not valid Unicode"
+        )
     return problems
 
 
@@ -236,29 +560,46 @@ def check_record(record: Any) -> RecordCheck:
     if record.type not in TYPES:
         errors.append(f"type {record.type!r} is not one of {', '.join(TYPES)}")
     if record.category not in TAXONOMY:
-        errors.append(f"category {record.category!r} is not one of {', '.join(CATEGORIES)}")
+        errors.append(
+            f"category {record.category!r} is not one of {', '.join(CATEGORIES)}"
+        )
     for name in ("subject", "topic"):
         value = getattr(record, name)
         if value is not None and not (isinstance(value, str) and SLUG.match(value)):
-            errors.append(f"{name} {value!r} must be lowercase letters, digits and _ (at most 64)")
+            errors.append(
+                f"{name} {value!r} must be lowercase letters, digits and _ (at most 64)"
+            )
     if record.difficulty is not None and record.difficulty not in DIFFICULTIES:
-        errors.append(f"difficulty {record.difficulty!r} is not one of {', '.join(DIFFICULTIES)}")
+        errors.append(
+            f"difficulty {record.difficulty!r} is not one of {', '.join(DIFFICULTIES)}"
+        )
     if not (isinstance(record.language, str) and LANGUAGE.match(record.language)):
-        errors.append(f"language {record.language!r} is not a language code such as en or pt-br")
+        errors.append(
+            f"language {record.language!r} is not a language code such as en or pt-br"
+        )
     if not (isinstance(record.source, str) and SOURCE.match(record.source)):
-        errors.append(f"source {record.source!r} must be lowercase letters, digits and _")
+        errors.append(
+            f"source {record.source!r} must be lowercase letters, digits and _"
+        )
     if record.dataset_tag is not None and not (
-        isinstance(record.dataset_tag, str) and DATASET_TAG.match(record.dataset_tag)
+        isinstance(record.dataset_tag, str)
+        and DATASET_TAG.match(record.dataset_tag)
         and record.dataset_tag != ALL_TAGS
     ):
-        errors.append(f"dataset_tag {record.dataset_tag!r} must be letters, digits, _ . - and not 'all'")
+        errors.append(
+            f"dataset_tag {record.dataset_tag!r} must be letters, digits, _ . - and not 'all'"
+        )
     for name in ("enabled", "verified"):
         if not isinstance(getattr(record, name), bool):
-            errors.append(f"{name} must be true or false, got {getattr(record, name)!r}")
+            errors.append(
+                f"{name} must be true or false, got {getattr(record, name)!r}"
+            )
     if not isinstance(record.metadata, dict):
         errors.append("metadata must be a JSON object")
     elif len(record.metadata) > MAX_METADATA_KEYS:
-        errors.append(f"metadata has {len(record.metadata)} keys, the limit is {MAX_METADATA_KEYS}")
+        errors.append(
+            f"metadata has {len(record.metadata)} keys, the limit is {MAX_METADATA_KEYS}"
+        )
 
     errors += _text_problems("input", record.input, MAX_INPUT_CHARS)
     errors += _text_problems("output", record.output, MAX_OUTPUT_CHARS)
@@ -266,14 +607,18 @@ def check_record(record: Any) -> RecordCheck:
     if not errors:
         expected = fingerprint(record)
         if record.fingerprint != expected:
-            errors.append(f"fingerprint {record.fingerprint or '(none)'} does not match its content "
-                          f"({expected}); the row was changed without its fingerprint")
+            errors.append(
+                f"fingerprint {record.fingerprint or '(none)'} does not match its content "
+                f"({expected}); the row was changed without its fingerprint"
+            )
     elif record.fingerprint and not FINGERPRINT.match(str(record.fingerprint)):
         errors.append("fingerprint is not a sha256 hex digest")
 
     subjects = TAXONOMY.get(record.category, {})
     if not errors and record.subject and subjects and record.subject not in subjects:
-        warnings.append(f"subject {record.subject!r} is not a known {record.category} subject")
+        warnings.append(
+            f"subject {record.subject!r} is not a known {record.category} subject"
+        )
     topics = subjects.get(record.subject or "", [])
     if not errors and record.topic and topics and record.topic not in topics:
         warnings.append(f"topic {record.topic!r} is not a known {record.subject} topic")
@@ -298,14 +643,18 @@ def format_record(record: Any) -> str:
 
 
 def group_key(record: Any) -> str:
-    group = (record.metadata or {}).get("group") if isinstance(record.metadata, dict) else None
+    group = (
+        (record.metadata or {}).get("group")
+        if isinstance(record.metadata, dict)
+        else None
+    )
     if isinstance(group, (str, int)) and str(group).strip():
         return "group:" + normal_text(str(group)).casefold()
     return "input:" + normal_text(record.input).casefold()
 
 
 def split_of(group: str, seed: int, fractions: Mapping[str, float]) -> str:
-    digest = hashlib.sha256(f"{seed}{SEPARATOR}{group}".encode("utf-8")).digest()
+    digest = hashlib.sha256(f"{seed}{SEPARATOR}{group}".encode()).digest()
     position = int.from_bytes(digest[:8], "big") / float(1 << 64)
     if position < fractions["train"]:
         return "train"
@@ -314,7 +663,7 @@ def split_of(group: str, seed: int, fractions: Mapping[str, float]) -> str:
     return "test"
 
 
-def taxonomy_lines(categories: Optional[Sequence[str]] = None) -> List[str]:
+def taxonomy_lines(categories: Sequence[str] | None = None) -> list[str]:
     lines = []
     for category in categories or CATEGORIES:
         subjects = TAXONOMY.get(category, {})
@@ -330,28 +679,36 @@ SELECTION_MODES = ("verified", "unverified_too", "everything")
 
 @dataclass
 class Selection:
-
     dataset_tag: str = ALL_TAGS
-    types: List[str] = field(default_factory=list)
-    categories: List[str] = field(default_factory=list)
-    subjects: List[str] = field(default_factory=list)
-    languages: List[str] = field(default_factory=list)
+    types: list[str] = field(default_factory=list)
+    categories: list[str] = field(default_factory=list)
+    subjects: list[str] = field(default_factory=list)
+    languages: list[str] = field(default_factory=list)
     mode: str = "verified"
-    as_of: Optional[str] = None
+    as_of: str | None = None
 
-    def validate(self) -> "Selection":
+    def validate(self) -> Selection:
         if self.mode not in SELECTION_MODES:
-            raise ValueError(f"selection mode must be one of {', '.join(SELECTION_MODES)}")
-        if self.dataset_tag != ALL_TAGS and not DATASET_TAG.match(self.dataset_tag or ""):
-            raise ValueError(f"dataset tag {self.dataset_tag!r} must be letters, digits, _ . - "
-                             f"(or 'all' for every row)")
+            raise ValueError(
+                f"selection mode must be one of {', '.join(SELECTION_MODES)}"
+            )
+        if self.dataset_tag != ALL_TAGS and not DATASET_TAG.match(
+            self.dataset_tag or ""
+        ):
+            raise ValueError(
+                f"dataset tag {self.dataset_tag!r} must be letters, digits, _ . - "
+                f"(or 'all' for every row)"
+            )
         self.types = sorted({slug(t) or "" for t in self.types})
         self.categories = sorted({slug(c) or "" for c in self.categories})
         self.subjects = sorted({slug(s) or "" for s in self.subjects})
         self.languages = sorted({language_code(l) for l in self.languages})
-        for name, values, pattern in (("type", self.types, SLUG), ("category", self.categories, SLUG),
-                                      ("subject", self.subjects, SLUG),
-                                      ("language", self.languages, LANGUAGE)):
+        for name, values, pattern in (
+            ("type", self.types, SLUG),
+            ("category", self.categories, SLUG),
+            ("subject", self.subjects, SLUG),
+            ("language", self.languages, LANGUAGE),
+        ):
             bad = [v for v in values if not pattern.match(v)]
             if bad:
                 raise ValueError(f"{name} filter {bad} is not a valid {name}")
@@ -360,7 +717,9 @@ class Selection:
             raise ValueError(f"type filter {unknown} is not one of {', '.join(TYPES)}")
         unknown = [c for c in self.categories if c not in TAXONOMY]
         if unknown:
-            raise ValueError(f"category filter {unknown} is not one of {', '.join(CATEGORIES)}")
+            raise ValueError(
+                f"category filter {unknown} is not one of {', '.join(CATEGORIES)}"
+            )
         return self
 
     @property
@@ -386,9 +745,7 @@ class Selection:
             return False
         if self.languages and record.language not in self.languages:
             return False
-        if self.as_of is not None and str(record.updated_at) > self.as_of:
-            return False
-        return True
+        return not (self.as_of is not None and str(record.updated_at) > self.as_of)
 
     def describe(self) -> str:
         rules = []
@@ -396,17 +753,24 @@ class Selection:
             rules.append("enabled = true")
         if self.verified_only:
             rules.append("verified = true")
-        rules.append("any dataset_tag" if self.dataset_tag == ALL_TAGS
-                     else f"dataset_tag = '{self.dataset_tag}'")
-        for name, values in (("type", self.types), ("category", self.categories),
-                             ("subject", self.subjects), ("language", self.languages)):
+        rules.append(
+            "any dataset_tag"
+            if self.dataset_tag == ALL_TAGS
+            else f"dataset_tag = '{self.dataset_tag}'"
+        )
+        for name, values in (
+            ("type", self.types),
+            ("category", self.categories),
+            ("subject", self.subjects),
+            ("language", self.languages),
+        ):
             if values:
                 rules.append(f"{name} in ({', '.join(values)})")
         if self.as_of:
             rules.append(f"updated_at <= {self.as_of}")
         return " AND ".join(rules)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "dataset_tag": self.dataset_tag,
             "types": list(self.types),

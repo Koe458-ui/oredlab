@@ -10,15 +10,15 @@ from ored.utils.weight_stats import (
 )
 
 __all__ = [
-    "load_checkpoint",
-    "save_checkpoint",
-    "get_logger",
-    "section",
-    "set_seed",
-    "resolve_device",
     "format_weight_change",
+    "get_logger",
     "group_weight_change",
     "layer_stats",
+    "load_checkpoint",
+    "resolve_device",
+    "save_checkpoint",
+    "section",
+    "set_seed",
     "snapshot_parameters",
     "summarise_weight_change",
 ]

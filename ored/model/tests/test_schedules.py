@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from ored.training.schedules import build_schedule, constant, cosine_with_warmup
 
 
@@ -22,8 +21,12 @@ def test_decay_is_monotonically_decreasing():
 
 
 def test_ends_at_min_ratio():
-    assert cosine_with_warmup(999, 1000, 100, min_ratio=0.1) == pytest.approx(0.1, abs=1e-3)
-    assert cosine_with_warmup(999, 1000, 100, min_ratio=0.5) == pytest.approx(0.5, abs=1e-3)
+    assert cosine_with_warmup(999, 1000, 100, min_ratio=0.1) == pytest.approx(
+        0.1, abs=1e-3
+    )
+    assert cosine_with_warmup(999, 1000, 100, min_ratio=0.5) == pytest.approx(
+        0.5, abs=1e-3
+    )
 
 
 def test_never_leaves_its_bounds():

@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from ored.config import Config, config_from_dict, load_config
 
 CONFIG_PATH = Path(__file__).resolve().parent / "configs" / "language_model.yaml"
@@ -17,8 +16,15 @@ def test_loads_the_real_config():
 
 
 def test_overrides_are_typed():
-    cfg = load_config(CONFIG_PATH, ["training.epochs=3", "model.d_model=64",
-                                    "deterministic=false", "model.attention=sdpa"])
+    cfg = load_config(
+        CONFIG_PATH,
+        [
+            "training.epochs=3",
+            "model.d_model=64",
+            "deterministic=false",
+            "model.attention=sdpa",
+        ],
+    )
     assert cfg.training.epochs == 3 and isinstance(cfg.training.epochs, int)
     assert cfg.model.d_model == 64
     assert cfg.deterministic is False
@@ -64,12 +70,25 @@ def test_text_settings_stay_text_when_they_look_like_numbers():
     from ored.config import load_config
 
     path = Path(__file__).resolve().parent / "configs" / "language_model.yaml"
-    cfg = load_config(path, ["data.source=supabase", "data.supabase.dataset_tag=2024",
-                             "data.supabase.snapshot=" + "1e5" + "0" * 61, "run_name=007",
-                             "training.epochs=3", "training.learning_rate=1e-4", "data.shuffle_train=false"])
+    cfg = load_config(
+        path,
+        [
+            "data.source=supabase",
+            "data.supabase.dataset_tag=2024",
+            "data.supabase.snapshot=" + "1e5" + "0" * 61,
+            "run_name=007",
+            "training.epochs=3",
+            "training.learning_rate=1e-4",
+            "data.shuffle_train=false",
+        ],
+    )
     assert cfg.data.supabase.dataset_tag == "2024" and cfg.run_name == "007"
     assert cfg.data.supabase.snapshot == "1e5" + "0" * 61
-    assert cfg.training.epochs == 3 and cfg.training.learning_rate == 1e-4 and cfg.data.shuffle_train is False
+    assert (
+        cfg.training.epochs == 3
+        and cfg.training.learning_rate == 1e-4
+        and cfg.data.shuffle_train is False
+    )
 
 
 def test_subword_vocab_must_hold_every_byte():
