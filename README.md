@@ -191,8 +191,8 @@
   </tr>
   <tr>
     <td align="center">250M</td>
-    <td align="center">⏳ Pending</td>
-    <td align="center">Planned</td>
+    <td align="center">🔄 In Progress</td>
+    <td align="center">Architecture configured; training a checkpoint remains</td>
     <td align="center">-</td>
   </tr>
   <tr>

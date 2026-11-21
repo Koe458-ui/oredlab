@@ -105,14 +105,16 @@ set "ORED_R2_BUCKET=GCS_BUCKET"
 
 ### R2
 
-Put ur R2 details here:
+The raw training files are in `ored-datasets` under `training data/`.
 
 ```
-set "ORED_R2_ACCOUNT_ID=ACCOUNT_ID"
-set "ORED_R2_ACCESS_KEY_ID=ACCESS_KEY_ID"
-set "ORED_R2_SECRET_ACCESS_KEY=SECRET_ACCESS_KEY"
-set "ORED_R2_BUCKET=DATA_BUCKET"
+set "ORED_R2_ACCOUNT_ID=YOUR_ACCOUNT_ID"
+set "ORED_R2_ACCESS_KEY_ID=YOUR_DATA_READ_ACCESS_KEY_ID"
+set "ORED_R2_SECRET_ACCESS_KEY=YOUR_DATA_READ_SECRET_ACCESS_KEY"
+set "ORED_R2_BUCKET=ored-datasets"
 ```
+
+Create separate [R2 API tokens](https://developers.cloudflare.com/r2/api/tokens/): an Object Read only token scoped to `ored-datasets`, an Object Read & Write token scoped to `ored-tokenized` for publishing, and an Object Read only token scoped to `ored-tokenized` for training. Use the first token for raw-data inspection and fetching. Keep every key local; never commit or upload keys to GitHub.
 
 ### Supabase
 
@@ -143,40 +145,71 @@ See what checkpoints u have:
 python scripts/checkpoints.py list
 ```
 
-Download the best one for `ored50m`:
+A 250M checkpoint has not been published yet. Skip this step until one is uploaded. Then download it with:
 
 ```
-python scripts/checkpoints.py pull checkpoints/ored50m/best.pt --kind best --run-name ored50m
+python scripts/checkpoints.py pull checkpoints/ored250m/best.pt --kind best --run-name ored250m
 ```
 
 This only works if ur Supabase already has the checkpoint saved. A new empty project won't have Ored's checkpoint in it.
 
-## 8. Check tokenizer and data
+## 8. Prepare the R2 data
 
-Make sure the tokenizer file is there:
-
-```
-dir data\tokenizer.json
-```
-
-U have to get `data/tokenizer.json` separately, it doesn't download by itself. And it has to be the same tokenizer that was used to make the dataset, otherwise training won't work. The dataset (`ored-data`, version `v1`) downloads from R2 by itself when u start training, as long as it's there in the right folder.
-
-## 9. Train
-
-Run this from the `ored/model` folder once everything above is done:
+Check the Parquet schema. This reads object metadata and small ranges; it does not download the full file:
 
 ```
-python scripts/pretrain.py --resume --set training.device=cuda --set data.tokens.dataset_name=ored-data --set data.tokens.dataset_version=v1 --set data.tokens.tokenizer=data/tokenizer.json
+python scripts/corpus.py r2-list --prefix "training data/"
+python scripts/corpus.py r2-inspect "training data/eduknow_A.parquet"
+python scripts/corpus.py r2-inspect "training data/tinystories.txt" --head-mb 1
 ```
 
-`--resume` means it continues from the best checkpoint u downloaded. If something is missing or doesn't match (checkpoint, dataset, tokenizer or keys), it will just stop with an error.
+Use the text field reported by `r2-inspect` below in place of `TEXT_FIELD`. The Parquet files total about 28.3 GB and the `.txt` object is separate. The following command downloads both, about 30 GB total, to your machine; run it only when you are ready to prepare the corpus:
 
-## 10. Save the checkpoint
+```
+python scripts/corpus.py r2-fetch --prefix "training data/" --out data/raw/eduknow
+```
+
+The `.txt` inspection reads at most 1 MB and reports counts for `<|endoftext|>`, blank lines, and line breaks without printing story text. Replace `TEXT_DELIMITER` below with the verified separator. Use `blank-line` for empty lines, `line` for one record per line, or the exact marker string for a custom separator.
+
+## 9. Build and publish token shards
+
+Train the 16,384-token tokenizer and create token shards from the downloaded Parquet and text files:
+
+```
+python scripts/corpus.py train-tokenizer --input data/raw/eduknow --text-field TEXT_FIELD --text-delimiter TEXT_DELIMITER --vocab-size 16384 --name ored250m --version v1 --out data/tokenizers/ored250m-v1.json
+python scripts/corpus.py build-shards --input data/raw/eduknow --text-field TEXT_FIELD --text-delimiter TEXT_DELIMITER --tokenizer data/tokenizers/ored250m-v1.json --name eduknow --version v1 --out data/tokens/eduknow/v1/ored250m-v1
+```
+
+Switch to the Object Read & Write token scoped only to `ored-tokenized`, then publish the prepared shards:
+
+```
+set "ORED_R2_ACCESS_KEY_ID=YOUR_TOKENIZED_READ_WRITE_ACCESS_KEY_ID"
+set "ORED_R2_SECRET_ACCESS_KEY=YOUR_TOKENIZED_READ_WRITE_SECRET_ACCESS_KEY"
+set "ORED_R2_BUCKET=ored-tokenized"
+python scripts/corpus.py publish --dir data/tokens/eduknow/v1/ored250m-v1 --name eduknow --version v1
+```
+
+The 250M config points to `eduknow` version `v1` and the matching tokenizer. On another PC, put the tokenizer artifact at `data/tokenizers/ored250m-v1.json`, switch to the Object Read only token for `ored-tokenized`, and start training; the token shards download to the ignored local `data/tokens` cache.
+
+## 10. Train
+
+Run this from the `ored/model` folder for a fresh 250M training run:
+
+```
+set "ORED_R2_ACCESS_KEY_ID=YOUR_TOKENIZED_READ_ACCESS_KEY_ID"
+set "ORED_R2_SECRET_ACCESS_KEY=YOUR_TOKENIZED_READ_SECRET_ACCESS_KEY"
+set "ORED_R2_BUCKET=ored-tokenized"
+python scripts/pretrain.py --set training.device=cuda
+```
+
+Use `--resume` only to continue this 250M run. Training stops if the tokenizer, token shard manifest, or checkpoint is incompatible.
+
+## 11. Save the checkpoint
 
 When training is done, upload ur best checkpoint:
 
 ```
-python scripts/checkpoints.py push checkpoints/ored50m/best.pt --kind best --run-name ored50m
+python scripts/checkpoints.py push checkpoints/ored250m/best.pt --kind best --run-name ored250m
 ```
 
 Check it got saved:

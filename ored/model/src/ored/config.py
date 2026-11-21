@@ -431,7 +431,7 @@ class Config:
             raise ValueError(f"task must be language_model, got {self.task!r}")
         if self.checkpoint.policy == "best_only" and self.data.source != "tokens":
             raise ValueError(
-                f"this config (checkpoint.policy: best_only, e.g. ored50m) trains only on token "
+                f"this config (checkpoint.policy: best_only, e.g. ored250m) trains only on token "
                 f"shards from R2 (data.source: tokens), not on data.source: {self.data.source}"
             )
         if self.data.source == "tokens" and self.checkpoint.policy != "best_only":

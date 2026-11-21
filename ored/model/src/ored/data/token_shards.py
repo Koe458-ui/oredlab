@@ -133,6 +133,7 @@ class BuildSettings:
     )
     max_tokens_per_shard: int = DEFAULT_MAX_TOKENS_PER_SHARD
     chunk_bytes: int = DEFAULT_CHUNK_BYTES
+    text_delimiter: str = ""
 
     def validate(self) -> None:
         if abs(sum(self.fractions.values()) - 1.0) > 1e-6 or set(self.fractions) != set(
@@ -243,11 +244,14 @@ def content_sha256(manifest: dict[str, Any]) -> str:
 def unit_signature(
     tokenizer_sha256: str, settings: BuildSettings, file_format: str | None
 ) -> str:
+    settings_dict = dict(settings.__dict__)
+    if not settings.text_delimiter:
+        settings_dict.pop("text_delimiter")
     return hashlib.sha256(
         json.dumps(
             {
                 "tokenizer": tokenizer_sha256,
-                "settings": settings.__dict__,
+                "settings": settings_dict,
                 "format": file_format,
             },
             sort_keys=True,
@@ -292,6 +296,7 @@ def _unit_worker(
         settings.id_field,
         file_format=fmt,
         byte_range=byte_range,
+        text_delimiter=settings.text_delimiter,
     )
     result = tokenize_unit(
         unit["key"],
@@ -371,6 +376,11 @@ def build_token_shards(
         )
     if len({d["sha256"] for d in described}) != len(described):
         raise ShardError("the same file is listed twice")
+    if (
+        any(d["file_format"] == "text" for d in described)
+        and not settings.text_delimiter
+    ):
+        raise ShardError("text inputs require an explicit text_delimiter")
     formats = {d["file_format"] for d in described}
     signature = unit_signature(
         tokenizer_info["sha256"], settings, formats.pop() if len(formats) == 1 else None
@@ -448,6 +458,13 @@ def build_token_shards(
             skipped_empty=sum(d["skipped_empty"] for d in mine),
             skipped_invalid_unicode=sum(d["skipped_invalid_unicode"] for d in mine),
         )
+    reader_settings = {
+        "text_field": settings.text_field,
+        "id_field": settings.id_field,
+        "chunk_bytes": settings.chunk_bytes,
+    }
+    if settings.text_delimiter:
+        reader_settings["text_delimiter"] = settings.text_delimiter
     manifest: dict[str, Any] = {
         "format": SHARDS_FORMAT,
         "dataset": {
@@ -456,11 +473,7 @@ def build_token_shards(
             "registry_id": None,
             "sources": described,
         },
-        "reader": {
-            "text_field": settings.text_field,
-            "id_field": settings.id_field,
-            "chunk_bytes": settings.chunk_bytes,
-        },
+        "reader": reader_settings,
         "tokenizer": tokenizer_info,
         "dtype": dtype_for(tokenizer.vocab_size),
         "eos_id": eos_id,

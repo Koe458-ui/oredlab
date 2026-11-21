@@ -4,6 +4,7 @@ import gzip
 import hashlib
 import io
 import json
+import re
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,7 +14,7 @@ GZIP_MAGIC = b"\x1f\x8b"
 ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 PARQUET_MAGIC = b"PAR1"
 
-FORMATS = ("jsonl", "parquet")
+FORMATS = ("jsonl", "parquet", "text")
 COMPRESSIONS = ("gzip", "zstd")
 
 
@@ -53,6 +54,8 @@ def detect_format(path: str | Path) -> FileFormat:
         fmt = "jsonl"
     elif inner and inner[-1] == ".parquet":
         fmt = "parquet"
+    elif inner and inner[-1] == ".txt":
+        fmt = "text"
     return FileFormat(fmt, compression)
 
 
@@ -205,6 +208,57 @@ class ParquetReader(DatasetReader):
             yield from batch.to_pylist()
 
 
+class TextReader(DatasetReader):
+    chunk_chars = 1024 * 1024
+    max_document_chars = 64 * 1024 * 1024
+
+    def __init__(
+        self,
+        path: str | Path,
+        delimiter: str,
+        id_field: str | None = None,
+        metadata_fields: Sequence[str] = (),
+    ) -> None:
+        if id_field or metadata_fields:
+            raise ReaderError("plain text inputs do not support ID or metadata fields")
+        if not delimiter:
+            raise ReaderError("text inputs require an explicit text delimiter")
+        self.blank_line = delimiter == "blank-line"
+        if delimiter == "line":
+            delimiter = "\n"
+        super().__init__(path, "text")
+        self.delimiter = delimiter
+
+    def _records(self) -> Iterator[dict[str, Any]]:
+        buffer = ""
+        found_delimiter = False
+        try:
+            with self.path.open("r", encoding="utf-8-sig") as handle:
+                while chunk := handle.read(self.chunk_chars):
+                    combined = buffer + chunk
+                    if self.blank_line:
+                        parts = re.split(r"\n[ \t]*\n+", combined)
+                    else:
+                        parts = combined.split(self.delimiter)
+                    buffer = parts.pop()
+                    if parts:
+                        found_delimiter = True
+                    for text in parts:
+                        if text.strip():
+                            yield {"text": text}
+                    if len(buffer) > self.max_document_chars:
+                        raise ReaderError(
+                            f"{self.path.name} has no delimiter or a text record exceeds "
+                            f"{self.max_document_chars:,} characters"
+                        )
+        except UnicodeDecodeError as exc:
+            raise ReaderError(f"{self.path.name} is not valid UTF-8 text") from exc
+        if not found_delimiter:
+            raise ReaderError(f"{self.path.name} contains no text delimiter")
+        if buffer.strip():
+            yield {"text": buffer}
+
+
 def _pyarrow_parquet(path: Path) -> Any:
     try:
         from pyarrow import parquet
@@ -225,10 +279,11 @@ def open_reader(
     metadata_fields: Sequence[str] = (),
     file_format: str | None = None,
     byte_range: tuple[int, int] | None = None,
+    text_delimiter: str = "",
 ) -> DatasetReader:
     detected = detect_format(path)
     fmt = file_format or detected.format
-    if fmt not in READERS:
+    if fmt not in READERS and fmt != "text":
         raise ReaderError(
             f"cannot tell how to read {Path(path).name} (detected {detected.describe()}); "
             f"pass the format explicitly: one of {', '.join(READERS)}"
@@ -241,6 +296,8 @@ def open_reader(
         return JsonlReader(
             path, text_field, id_field, metadata_fields, byte_range=byte_range
         )
+    if fmt == "text":
+        return TextReader(path, text_delimiter, id_field, metadata_fields)
     return READERS[fmt](path, text_field, id_field, metadata_fields)
 
 
@@ -304,6 +361,17 @@ def inspect_file(path: str | Path, max_records: int = 5) -> dict[str, Any]:
         report["parquet_schema"] = [f"{f.name}: {f.type}" for f in handle.schema_arrow]
         batch = next(handle.iter_batches(batch_size=max_records), None)
         records = batch.to_pylist() if batch is not None else []
+    elif detected.format == "text":
+        with path.open("rb") as handle:
+            sample = handle.read(1024 * 1024)
+        text = sample.decode("utf-8-sig", "replace").replace("\r\n", "\n")
+        report["sampled_bytes"] = len(sample)
+        report["text_delimiter_counts"] = {
+            "<|endoftext|>": text.count("<|endoftext|>"),
+            "blank_lines": len(re.findall(r"\n[ \t]*\n", text)),
+            "line_breaks": text.count("\n"),
+        }
+        records = []
     else:
         records = []
     report["records_sampled"] = len(records)
